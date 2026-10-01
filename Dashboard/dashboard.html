@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PMP project dashboard layout preview">
+  <title>PMP Dashboard · Layout Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fc;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --border: #dde5f0;
+      --text: #172033;
+      --muted: #667085;
+      --primary: #2563eb;
+      --primary-soft: #eaf1ff;
+      --accent: #0f766e;
+      --warning: #b45309;
+      --shadow: 0 8px 24px rgba(23, 32, 51, 0.06);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button,
+    a {
+      font: inherit;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 20px;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #ffffff;
+      background: var(--primary);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.22);
+    }
+
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .nav-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: #475467;
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 650;
+    }
+
+    .nav-link:hover,
+    .nav-link:focus-visible,
+    .nav-link.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+      outline: none;
+    }
+
+    .nav-number {
+      width: 24px;
+      height: 24px;
+      border: 1px solid currentColor;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      font-size: 0.72rem;
+    }
+
+    .language-panel {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .language-label {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .language-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-soft);
+    }
+
+    .language-switch button {
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 7px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .language-switch button.active {
+      color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 1px 4px rgba(23, 32, 51, 0.08);
+    }
+
+    main {
+      min-width: 0;
+      padding: 36px clamp(22px, 4vw, 56px) 64px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--primary);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+      font-size: clamp(1.9rem, 4vw, 2.7rem);
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+    }
+
+    .page-subtitle {
+      max-width: 720px;
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .preview-badge {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      color: #1d4ed8;
+      background: #eff6ff;
+      font-size: 0.8rem;
+      font-weight: 750;
+    }
+
+    .preview-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    section {
+      scroll-margin-top: 24px;
+      margin-top: 42px;
+    }
+
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .section-heading h2 {
+      margin-bottom: 5px;
+      font-size: 1.32rem;
+      letter-spacing: -0.02em;
+    }
+
+    .section-heading p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .source-chip {
+      max-width: 420px;
+      padding: 7px 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #475467;
+      background: var(--surface);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.72rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .kpi-card,
+    .panel,
+    .source-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .kpi-card {
+      min-height: 124px;
+      padding: 18px;
+    }
+
+    .kpi-label {
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 0.79rem;
+      font-weight: 700;
+    }
+
+    .kpi-value {
+      margin-bottom: 5px;
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .kpi-note {
+      margin-bottom: 0;
+      color: #98a2b3;
+      font-size: 0.73rem;
+    }
+
+    .content-grid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+      gap: 14px;
+    }
+
+    .panel {
+      min-width: 0;
+      padding: 20px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel h3 {
+      margin-bottom: 0;
+      font-size: 0.96rem;
+    }
+
+    .placeholder-tag {
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: var(--warning);
+      background: #fff7ed;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .chart-placeholder {
+      min-height: 250px;
+      padding: 24px;
+      border: 1px dashed #b8c6da;
+      border-radius: 12px;
+      background:
+        linear-gradient(to right, transparent 0, transparent calc(100% - 1px), #edf1f7 calc(100% - 1px)),
+        linear-gradient(to bottom, transparent 0, transparent calc(100% - 1px), #edf1f7 calc(100% - 1px));
+      background-size: 25% 100%, 100% 25%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .chart-bars {
+      width: min(82%, 440px);
+      height: 92px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .chart-bars span {
+      width: 11%;
+      min-width: 18px;
+      border-radius: 5px 5px 0 0;
+      background: #dbe7fb;
+    }
+
+    .chart-bars span:nth-child(1) { height: 40%; }
+    .chart-bars span:nth-child(2) { height: 68%; }
+    .chart-bars span:nth-child(3) { height: 52%; }
+    .chart-bars span:nth-child(4) { height: 84%; }
+    .chart-bars span:nth-child(5) { height: 61%; }
+    .chart-bars span:nth-child(6) { height: 74%; }
+
+    .placeholder-title {
+      margin: 0;
+      color: #475467;
+      font-size: 0.88rem;
+      font-weight: 750;
+    }
+
+    .placeholder-copy {
+      max-width: 420px;
+      margin: 0;
+      font-size: 0.76rem;
+    }
+
+    .table-panel {
+      margin-top: 14px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 620px;
+      font-size: 0.8rem;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      color: #475467;
+      background: var(--surface-soft);
+      font-weight: 750;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .table-placeholder td {
+      height: 42px;
+      color: #98a2b3;
+    }
+
+    .skeleton-line {
+      display: inline-block;
+      width: 72%;
+      height: 8px;
+      border-radius: 99px;
+      background: #e8edf4;
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .source-card {
+      padding: 18px;
+    }
+
+    .source-card strong {
+      display: block;
+      margin-bottom: 8px;
+      overflow-wrap: anywhere;
+      font-size: 0.82rem;
+    }
+
+    .source-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.77rem;
+    }
+
+    .notice {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border: 1px solid #fed7aa;
+      border-radius: 12px;
+      color: #92400e;
+      background: #fffaf3;
+      font-size: 0.82rem;
+    }
+
+    footer {
+      margin-top: 44px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    @media (max-width: 1040px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+        padding: 16px 22px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        flex-direction: row;
+        align-items: center;
+      }
+
+      .nav-list {
+        display: flex;
+        flex-wrap: wrap;
+      }
+
+      .nav-number {
+        display: none;
+      }
+
+      .language-panel {
+        margin: 0 0 0 auto;
+        padding: 0;
+        border: 0;
+      }
+
+      .language-label {
+        display: none;
+      }
+
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .sidebar {
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .nav-list {
+        order: 3;
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 3px;
+      }
+
+      .nav-link {
+        white-space: nowrap;
+      }
+
+      main {
+        padding: 28px 18px 48px;
+      }
+
+      .page-header,
+      .section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .source-chip {
+        width: 100%;
+      }
+
+      .content-grid,
+      .source-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .brand small {
+        display: none;
+      }
+
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi-card {
+        min-height: 108px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Dashboard navigation">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span>
+          PMP Dashboard
+          <small data-i18n="brandSubtitle">Project reporting</small>
+        </span>
+      </div>
+
+      <nav>
+        <ul class="nav-list">
+          <li><a class="nav-link active" href="#overview"><span class="nav-number">01</span><span data-i18n="navOverview">Overview</span></a></li>
+          <li><a class="nav-link" href="#dates"><span class="nav-number">02</span><span data-i18n="navDates">Ticket dates</span></a></li>
+          <li><a class="nav-link" href="#families"><span class="nav-number">03</span><span data-i18n="navFamilies">Family coverage</span></a></li>
+          <li><a class="nav-link" href="#matrix"><span class="nav-number">04</span><span data-i18n="navMatrix">User matrix</span></a></li>
+          <li><a class="nav-link" href="#sources"><span class="nav-number">05</span><span data-i18n="navSources">Data sources</span></a></li>
+        </ul>
+      </nav>
+
+      <div class="language-panel">
+        <p class="language-label" data-i18n="language">Language</p>
+        <div class="language-switch" role="group" aria-label="Language">
+          <button class="active" type="button" data-language="en" aria-pressed="true">EN</button>
+          <button type="button" data-language="vi" aria-pressed="false">VI</button>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow" data-i18n="eyebrow">PMP project reporting</p>
+          <h1 data-i18n="pageTitle">Project data dashboard</h1>
+          <p class="page-subtitle" data-i18n="pageSubtitle">Layout preview for ticket dates, family coverage, and annotation ownership reporting.</p>
+        </div>
+        <span class="preview-badge"><span class="preview-dot" aria-hidden="true"></span><span data-i18n="previewBadge">Layout preview</span></span>
+      </header>
+
+      <section id="overview">
+        <div class="section-heading">
+          <div>
+            <h2 data-i18n="overviewTitle">Executive overview</h2>
+            <p data-i18n="overviewSubtitle">Top-level project indicators will appear here after data binding.</p>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi-card">
+            <p class="kpi-label" data-i18n="kpiTickets">Total annotation tickets</p>
+            <p class="kpi-value">—</p>
+            <p class="kpi-note" data-i18n="notLoaded">Data not loaded</p>
+          </article>
+          <article class="kpi-card">
+            <p class="kpi-label" data-i18n="kpiDateCoverage">Start / End coverage</p>
+            <p class="kpi-value">—</p>
+            <p class="kpi-note" data-i18n="notLoaded">Data not loaded</p>
+          </article>
+          <article class="kpi-card">
+            <p class="kpi-label" data-i18n="kpiOpen">Open tickets</p>
+            <p class="kpi-value">—</p>
+            <p class="kpi-note" data-i18n="notLoaded">Data not loaded</p>
+          </article>
+          <article class="kpi-card">
+            <p class="kpi-label" data-i18n="kpiFamilies">Families represented</p>
+            <p class="kpi-value">—</p>
+            <p class="kpi-note" data-i18n="notLoaded">Data not loaded</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="dates">
+        <div class="section-heading">
+          <div>
+            <h2 data-i18n="datesTitle">Ticket dates & duration</h2>
+            <p data-i18n="datesSubtitle">Planned placement for Start, End, Duration, and missing-date analysis.</p>
+          </div>
+          <code class="source-chip">RawSource/Ticket_Dates_DRAFT_20261001.xlsx</code>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi-card"><p class="kpi-label" data-i18n="totalTickets">Tickets</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="completeDates">Complete Start + End</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="missingDates">Missing Start / End</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="medianDuration">Median duration</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+        </div>
+
+        <div class="content-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h3 data-i18n="durationChart">Duration distribution</h3>
+              <span class="placeholder-tag" data-i18n="placeholder">Placeholder</span>
+            </div>
+            <div class="chart-placeholder">
+              <div class="chart-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+              <p class="placeholder-title" data-i18n="chartArea">Chart area</p>
+              <p class="placeholder-copy" data-i18n="durationChartCopy">Future histogram for ticket duration ranges.</p>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-header">
+              <h3 data-i18n="coverageChart">Date coverage</h3>
+              <span class="placeholder-tag" data-i18n="placeholder">Placeholder</span>
+            </div>
+            <div class="chart-placeholder">
+              <div class="chart-bars" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+              <p class="placeholder-title" data-i18n="chartArea">Chart area</p>
+              <p class="placeholder-copy" data-i18n="coverageChartCopy">Future comparison of complete and missing date fields.</p>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel table-panel">
+          <div class="panel-header">
+            <h3 data-i18n="missingDateTable">Tickets requiring date review</h3>
+            <span class="placeholder-tag" data-i18n="placeholder">Placeholder</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th data-i18n="ticket">Ticket</th><th data-i18n="start">Start</th><th data-i18n="end">End</th><th data-i18n="duration">Duration</th><th data-i18n="reviewReason">Review reason</th></tr></thead>
+              <tbody class="table-placeholder">
+                <tr><td><span class="skeleton-line"></span></td><td>—</td><td>—</td><td>—</td><td><span class="skeleton-line"></span></td></tr>
+                <tr><td><span class="skeleton-line"></span></td><td>—</td><td>—</td><td>—</td><td><span class="skeleton-line"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="families">
+        <div class="section-heading">
+          <div>
+            <h2 data-i18n="familiesTitle">Family upload & annotation coverage</h2>
+            <p data-i18n="familiesSubtitle">Planned comparison of uploaded families and linked annotation tickets.</p>
+          </div>
+          <code class="source-chip">RawSource/Family_Upload_vs_Annotation_Tickets_Checked.xlsx</code>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi-card"><p class="kpi-label" data-i18n="uploadedFamilies">Uploaded families</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="linkedTickets">Linked tickets</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="unmatchedFamilies">Unmatched families</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="familyCoverage">Coverage</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+        </div>
+
+        <div class="content-grid">
+          <article class="panel">
+            <div class="panel-header"><h3 data-i18n="familyChart">Tickets by family</h3><span class="placeholder-tag" data-i18n="placeholder">Placeholder</span></div>
+            <div class="chart-placeholder"><div class="chart-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p class="placeholder-title" data-i18n="chartArea">Chart area</p><p class="placeholder-copy" data-i18n="familyChartCopy">Future ranking of families by annotation ticket count.</p></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><h3 data-i18n="familyStatusChart">Match status</h3><span class="placeholder-tag" data-i18n="placeholder">Placeholder</span></div>
+            <div class="chart-placeholder"><div class="chart-bars" aria-hidden="true"><span></span><span></span><span></span></div><p class="placeholder-title" data-i18n="chartArea">Chart area</p><p class="placeholder-copy" data-i18n="familyStatusCopy">Future matched, unmatched, and review-needed split.</p></div>
+          </article>
+        </div>
+
+        <article class="panel table-panel">
+          <div class="panel-header"><h3 data-i18n="familyTable">Family coverage detail</h3><span class="placeholder-tag" data-i18n="placeholder">Placeholder</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th data-i18n="family">Family</th><th data-i18n="uploadStatus">Upload status</th><th data-i18n="ticketCount">Ticket count</th><th data-i18n="annotationStatus">Annotation status</th><th data-i18n="action">Action</th></tr></thead>
+              <tbody class="table-placeholder">
+                <tr><td><span class="skeleton-line"></span></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td><span class="skeleton-line"></span></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="matrix">
+        <div class="section-heading">
+          <div>
+            <h2 data-i18n="matrixTitle">Annotation ticket user matrix</h2>
+            <p data-i18n="matrixSubtitle">Planned workload, assignment, and status view by user.</p>
+          </div>
+          <code class="source-chip">RawSource/Annotation_Ticket_User_Matrix_Checked.xlsx</code>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi-card"><p class="kpi-label" data-i18n="activeUsers">Active users</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="assignedTickets">Assigned tickets</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="unassignedTickets">Unassigned tickets</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+          <article class="kpi-card"><p class="kpi-label" data-i18n="openByOwner">Open by owner</p><p class="kpi-value">—</p><p class="kpi-note" data-i18n="futureMetric">Future calculated metric</p></article>
+        </div>
+
+        <div class="content-grid">
+          <article class="panel">
+            <div class="panel-header"><h3 data-i18n="workloadChart">Ticket workload by user</h3><span class="placeholder-tag" data-i18n="placeholder">Placeholder</span></div>
+            <div class="chart-placeholder"><div class="chart-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div><p class="placeholder-title" data-i18n="chartArea">Chart area</p><p class="placeholder-copy" data-i18n="workloadChartCopy">Future user-level assigned ticket comparison.</p></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><h3 data-i18n="ownerStatusChart">Status by owner</h3><span class="placeholder-tag" data-i18n="placeholder">Placeholder</span></div>
+            <div class="chart-placeholder"><div class="chart-bars" aria-hidden="true"><span></span><span></span><span></span><span></span></div><p class="placeholder-title" data-i18n="chartArea">Chart area</p><p class="placeholder-copy" data-i18n="ownerStatusCopy">Future open and completed workload split.</p></div>
+          </article>
+        </div>
+
+        <article class="panel table-panel">
+          <div class="panel-header"><h3 data-i18n="matrixTable">User assignment detail</h3><span class="placeholder-tag" data-i18n="placeholder">Placeholder</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th data-i18n="user">User</th><th data-i18n="ticketCount">Ticket count</th><th data-i18n="openTickets">Open tickets</th><th data-i18n="completeTickets">Completed tickets</th><th data-i18n="missingDateTickets">Missing dates</th></tr></thead>
+              <tbody class="table-placeholder">
+                <tr><td><span class="skeleton-line"></span></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td><span class="skeleton-line"></span></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="sources">
+        <div class="section-heading">
+          <div>
+            <h2 data-i18n="sourcesTitle">Data sources</h2>
+            <p data-i18n="sourcesSubtitle">Locked source scope for the future data-bound dashboard.</p>
+          </div>
+        </div>
+        <div class="source-grid">
+          <article class="source-card"><strong>Ticket_Dates_DRAFT_20261001.xlsx</strong><p data-i18n="sourceDates">Future source for Start, End, Duration, coverage, and missing-date metrics.</p></article>
+          <article class="source-card"><strong>Family_Upload_vs_Annotation_Tickets_Checked.xlsx</strong><p data-i18n="sourceFamilies">Future source for upload-to-ticket family coverage and status reporting.</p></article>
+          <article class="source-card"><strong>Annotation_Ticket_User_Matrix_Checked.xlsx</strong><p data-i18n="sourceMatrix">Future source for user assignment, ticket ownership, and workload reporting.</p></article>
+        </div>
+        <div class="notice" data-i18n="scopeNotice">Layout review only — no Excel rows, calculated metrics, or embedded JSON are included in this revision.</div>
+      </section>
+
+      <footer data-i18n="footer">PMP dashboard layout skeleton · Prepared for structure review</footer>
+    </main>
+  </div>
+
+  <script>
+    const translations = {
+      en: {
+        brandSubtitle: "Project reporting",
+        navOverview: "Overview",
+        navDates: "Ticket dates",
+        navFamilies: "Family coverage",
+        navMatrix: "User matrix",
+        navSources: "Data sources",
+        language: "Language",
+        eyebrow: "PMP project reporting",
+        pageTitle: "Project data dashboard",
+        pageSubtitle: "Layout preview for ticket dates, family coverage, and annotation ownership reporting.",
+        previewBadge: "Layout preview",
+        overviewTitle: "Executive overview",
+        overviewSubtitle: "Top-level project indicators will appear here after data binding.",
+        kpiTickets: "Total annotation tickets",
+        kpiDateCoverage: "Start / End coverage",
+        kpiOpen: "Open tickets",
+        kpiFamilies: "Families represented",
+        notLoaded: "Data not loaded",
+        datesTitle: "Ticket dates & duration",
+        datesSubtitle: "Planned placement for Start, End, Duration, and missing-date analysis.",
+        totalTickets: "Tickets",
+        completeDates: "Complete Start + End",
+        missingDates: "Missing Start / End",
+        medianDuration: "Median duration",
+        futureMetric: "Future calculated metric",
+        durationChart: "Duration distribution",
+        placeholder: "Placeholder",
+        chartArea: "Chart area",
+        durationChartCopy: "Future histogram for ticket duration ranges.",
+        coverageChart: "Date coverage",
+        coverageChartCopy: "Future comparison of complete and missing date fields.",
+        missingDateTable: "Tickets requiring date review",
+        ticket: "Ticket",
+        start: "Start",
+        end: "End",
+        duration: "Duration",
+        reviewReason: "Review reason",
+        familiesTitle: "Family upload & annotation coverage",
+        familiesSubtitle: "Planned comparison of uploaded families and linked annotation tickets.",
+        uploadedFamilies: "Uploaded families",
+        linkedTickets: "Linked tickets",
+        unmatchedFamilies: "Unmatched families",
+        familyCoverage: "Coverage",
+        familyChart: "Tickets by family",
+        familyChartCopy: "Future ranking of families by annotation ticket count.",
+        familyStatusChart: "Match status",
+        familyStatusCopy: "Future matched, unmatched, and review-needed split.",
+        familyTable: "Family coverage detail",
+        family: "Family",
+        uploadStatus: "Upload status",
+        ticketCount: "Ticket count",
+        annotationStatus: "Annotation status",
+        action: "Action",
+        matrixTitle: "Annotation ticket user matrix",
+        matrixSubtitle: "Planned workload, assignment, and status view by user.",
+        activeUsers: "Active users",
+        assignedTickets: "Assigned tickets",
+        unassignedTickets: "Unassigned tickets",
+        openByOwner: "Open by owner",
+        workloadChart: "Ticket workload by user",
+        workloadChartCopy: "Future user-level assigned ticket comparison.",
+        ownerStatusChart: "Status by owner",
+        ownerStatusCopy: "Future open and completed workload split.",
+        matrixTable: "User assignment detail",
+        user: "User",
+        openTickets: "Open tickets",
+        completeTickets: "Completed tickets",
+        missingDateTickets: "Missing dates",
+        sourcesTitle: "Data sources",
+        sourcesSubtitle: "Locked source scope for the future data-bound dashboard.",
+        sourceDates: "Future source for Start, End, Duration, coverage, and missing-date metrics.",
+        sourceFamilies: "Future source for upload-to-ticket family coverage and status reporting.",
+        sourceMatrix: "Future source for user assignment, ticket ownership, and workload reporting.",
+        scopeNotice: "Layout review only — no Excel rows, calculated metrics, or embedded JSON are included in this revision.",
+        footer: "PMP dashboard layout skeleton · Prepared for structure review"
+      },
+      vi: {
+        brandSubtitle: "Báo cáo dự án",
+        navOverview: "Tổng quan",
+        navDates: "Ngày của phiếu",
+        navFamilies: "Độ phủ family",
+        navMatrix: "Ma trận người dùng",
+        navSources: "Nguồn dữ liệu",
+        language: "Ngôn ngữ",
+        eyebrow: "Báo cáo dự án PMP",
+        pageTitle: "Bảng điều khiển dữ liệu dự án",
+        pageSubtitle: "Bản xem trước bố cục cho ngày của phiếu, độ phủ family và phân công annotation.",
+        previewBadge: "Xem trước bố cục",
+        overviewTitle: "Tổng quan điều hành",
+        overviewSubtitle: "Các chỉ số dự án cấp cao sẽ hiển thị tại đây sau khi liên kết dữ liệu.",
+        kpiTickets: "Tổng phiếu annotation",
+        kpiDateCoverage: "Độ phủ Start / End",
+        kpiOpen: "Phiếu đang mở",
+        kpiFamilies: "Số family",
+        notLoaded: "Chưa nạp dữ liệu",
+        datesTitle: "Ngày và thời lượng phiếu",
+        datesSubtitle: "Vị trí dự kiến cho phân tích Start, End, Duration và ngày bị thiếu.",
+        totalTickets: "Số phiếu",
+        completeDates: "Đủ Start + End",
+        missingDates: "Thiếu Start / End",
+        medianDuration: "Thời lượng trung vị",
+        futureMetric: "Chỉ số sẽ được tính sau",
+        durationChart: "Phân bổ thời lượng",
+        placeholder: "Giữ chỗ",
+        chartArea: "Khu vực biểu đồ",
+        durationChartCopy: "Biểu đồ tần suất theo khoảng thời lượng phiếu trong tương lai.",
+        coverageChart: "Độ phủ ngày",
+        coverageChartCopy: "So sánh trường ngày đầy đủ và bị thiếu trong tương lai.",
+        missingDateTable: "Phiếu cần rà soát ngày",
+        ticket: "Phiếu",
+        start: "Bắt đầu",
+        end: "Kết thúc",
+        duration: "Thời lượng",
+        reviewReason: "Lý do rà soát",
+        familiesTitle: "Độ phủ upload family và annotation",
+        familiesSubtitle: "So sánh dự kiến giữa family đã upload và phiếu annotation được liên kết.",
+        uploadedFamilies: "Family đã upload",
+        linkedTickets: "Phiếu đã liên kết",
+        unmatchedFamilies: "Family chưa khớp",
+        familyCoverage: "Độ phủ",
+        familyChart: "Phiếu theo family",
+        familyChartCopy: "Xếp hạng family theo số phiếu annotation trong tương lai.",
+        familyStatusChart: "Trạng thái khớp",
+        familyStatusCopy: "Phân chia đã khớp, chưa khớp và cần rà soát trong tương lai.",
+        familyTable: "Chi tiết độ phủ family",
+        family: "Family",
+        uploadStatus: "Trạng thái upload",
+        ticketCount: "Số phiếu",
+        annotationStatus: "Trạng thái annotation",
+        action: "Hành động",
+        matrixTitle: "Ma trận người dùng và phiếu annotation",
+        matrixSubtitle: "Góc nhìn dự kiến về khối lượng, phân công và trạng thái theo người dùng.",
+        activeUsers: "Người dùng hoạt động",
+        assignedTickets: "Phiếu đã phân công",
+        unassignedTickets: "Phiếu chưa phân công",
+        openByOwner: "Phiếu mở theo người phụ trách",
+        workloadChart: "Khối lượng phiếu theo người dùng",
+        workloadChartCopy: "So sánh phiếu được phân công theo người dùng trong tương lai.",
+        ownerStatusChart: "Trạng thái theo người phụ trách",
+        ownerStatusCopy: "Phân chia khối lượng đang mở và hoàn tất trong tương lai.",
+        matrixTable: "Chi tiết phân công người dùng",
+        user: "Người dùng",
+        openTickets: "Phiếu đang mở",
+        completeTickets: "Phiếu hoàn tất",
+        missingDateTickets: "Phiếu thiếu ngày",
+        sourcesTitle: "Nguồn dữ liệu",
+        sourcesSubtitle: "Phạm vi nguồn đã khóa cho dashboard liên kết dữ liệu trong tương lai.",
+        sourceDates: "Nguồn tương lai cho Start, End, Duration, độ phủ và chỉ số thiếu ngày.",
+        sourceFamilies: "Nguồn tương lai cho độ phủ và trạng thái từ upload family đến phiếu.",
+        sourceMatrix: "Nguồn tương lai cho phân công, người phụ trách và khối lượng phiếu.",
+        scopeNotice: "Chỉ để duyệt bố cục — bản này không chứa dòng Excel, chỉ số đã tính hoặc JSON nhúng.",
+        footer: "Khung bố cục dashboard PMP · Chuẩn bị để duyệt cấu trúc"
+      }
+    };
+
+    const languageButtons = document.querySelectorAll("[data-language]");
+
+    function setLanguage(language) {
+      const dictionary = translations[language];
+      document.documentElement.lang = language;
+      document.querySelectorAll("[data-i18n]").forEach((element) => {
+        const key = element.dataset.i18n;
+        if (dictionary[key]) element.textContent = dictionary[key];
+      });
+      languageButtons.forEach((button) => {
+        const selected = button.dataset.language === language;
+        button.classList.toggle("active", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+    }
+
+    languageButtons.forEach((button) => {
+      button.addEventListener("click", () => setLanguage(button.dataset.language));
+    });
+
+    document.querySelectorAll(".nav-link").forEach((link) => {
+      link.addEventListener("click", () => {
+        document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
+        link.classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>
