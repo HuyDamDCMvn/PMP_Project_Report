@@ -62,7 +62,7 @@ function appShell() {
   return `
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand"><div class="brand-mark">PMP</div><div><strong>Project Control</strong><span>BIM · DIGITAL DELIVERY</span></div></div>
+        <div class="brand"><div class="brand-mark"><img src="${import.meta.env.BASE_URL}logo.svg" alt="DCMvn logo"></div><div><strong>Project Control</strong><span>BIM · DIGITAL DELIVERY</span></div></div>
         <nav class="nav">${nav}</nav>
         <div class="source-note">Snapshot ${fmtDate(data.meta.asOf)}<br>Reporting week CW${data.meta.reportingWeek}<br>3 controlled sources</div>
       </aside>
