@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-10-02T19:17:23.657549+07:00",
+  "matrix_tickets": 2703,
+  "scored": 2703,
+  "blank_score": 0,
+  "mantis_issue_missing": 0,
+  "excel_ne_mantis": 0,
+  "score_distribution": {
+    "2": 2435,
+    "3": 73,
+    "5": 3,
+    "7": 17,
+    "9": 13,
+    "10": 162
+  },
+  "source_distribution": {
+    "Mantis": 2703
+  },
+  "fetch_stats": {
+    "fetched": 388,
+    "cache": 2315
+  },
+  "force_refresh_n": 388,
+  "family_scored": 2001,
+  "family_blank": 42,
+  "family_multi_ticket": 1,
+  "weights": {
+    "Framework deliverables": 10,
+    "Create Revit templates for each LPH": 9,
+    "Output Checklists": 7,
+    "Lesson Learned": 6,
+    "Export layouts to Revizto & 3D Review": 5,
+    "Sample Model + Output Data": 3,
+    "Revise the RFA library": 2
+  },
+  "backups": [
+    "/workspace/annotation_project/Annotation_Ticket_User_Matrix_Checked_pre_weigh_20261002.xlsx",
+    "/workspace/annotation_project/Family_Upload_vs_Annotation_Tickets_Checked_pre_weigh_20261002.xlsx"
+  ],
+  "outputs": {
+    "matrix": "/workspace/annotation_project/Annotation_Ticket_User_Matrix_Checked.xlsx",
+    "family": "/workspace/annotation_project/Family_Upload_vs_Annotation_Tickets_Checked.xlsx",
+    "delta_csv": "/workspace/tidp_analysis/weigh_score_mantis_delta_20261002.csv",
+    "cache": "/workspace/tidp_analysis/mantis_wt_cache_20261002"
+  },
+  "mismatch_examples": [],
+  "wt_use_counts": {
+    "Sample Model + Output Data": 73,
+    "Export layouts to Revizto & 3D Review": 3,
+    "Create Revit templates for each LPH": 13,
+    "Output Checklists": 17,
+    "Framework deliverables": 162,
+    "Revise the RFA library": 2435
+  }
+}
