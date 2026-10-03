@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from decimal import Decimal, ROUND_FLOOR
 from collections import Counter, defaultdict
 from datetime import date, datetime
 from pathlib import Path
@@ -53,6 +54,13 @@ def week_number(label: str) -> int:
     return int(re.search(r"CW(\d+)", label).group(1))
 
 
+def quarter_hours(value: Any) -> float | None:
+    value = clean(value)
+    if value is None:
+        return None
+    return float((Decimal(str(value)) * 4).to_integral_value(rounding=ROUND_FLOOR) / 4)
+
+
 def main() -> None:
     ticket_path = RAW / "Annotation_Ticket_User_Matrix_Checked.xlsx"
     family_path = RAW / "Family_Upload_vs_Annotation_Tickets_Checked.xlsx"
@@ -60,6 +68,9 @@ def main() -> None:
 
     ticket_frame = pd.read_excel(ticket_path, sheet_name="Matrix")
     family_frame = pd.read_excel(family_path, sheet_name="Family_vs_Tickets")
+    family_frame = family_frame.loc[
+        family_frame["Project Name"].fillna("").str.strip().eq("DCMvn_Annotation Project")
+    ].copy()
     family_unmatched = pd.read_excel(family_path, sheet_name="Unmatched")
     tidp_frame = pd.read_excel(tidp_path, sheet_name="TIDP_Combined")
     week_columns = [column for column in tidp_frame.columns if str(column).startswith("CW")]
@@ -80,7 +91,8 @@ def main() -> None:
             "reporter": text(row.get("Reporter")),
             "department": text(row.get("Department")) or "Unknown",
             "handler": text(row.get("Handler")),
-            "actualHours": clean(row.get("Actual Hours")),
+            "actualHoursSource": clean(row.get("Actual Hours")),
+            "actualHours": quarter_hours(row.get("Actual Hours")),
             "active": text(row.get("Active")),
         }
         tickets.append(record)
@@ -100,12 +112,15 @@ def main() -> None:
             "key": key,
             "category": text(row.get("Category")) or "Unknown",
             "uploader": text(row.get("Uploader")),
+            "start": clean(row.get("Start Date")),
+            "end": clean(row.get("End Date")),
             "ticketIds": ticket_ids,
             "ticketStatus": text(row.get("Ticket_Status")) or "unknown",
             "active": text(row.get("Active")),
             "matchType": text(row.get("Match_Type")) or "Unknown",
             "detection": text(row.get("Detection")) or "Unknown",
             "projectClass": text(row.get("Project_Class")),
+            "reworkOutcome": text(row.get("Rework_Outcome")),
             "relationship": "Direct",
         }
         families.append(record)
@@ -137,6 +152,7 @@ def main() -> None:
             {
                 "id": f"TIDP-{index + 1:04d}",
                 "title": title,
+                "familyKey": family_key,
                 "system": text(row.get("System")) or "Unknown",
                 "owner": text(row.get("Person In Charge")),
                 "workType": work_type,

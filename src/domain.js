@@ -78,6 +78,16 @@ export function buildContext(data) {
   return { reportingWeek: data.meta.reportingWeek, openTicketIdsByFamily };
 }
 
+export function forecastCatchUp(actual, target, weeklyRate, reportingWeek) {
+  if (actual >= target) return { week: reportingWeek, points: [] };
+  if (!(weeklyRate > 0)) return { week: null, points: [] };
+  const week = reportingWeek + Math.ceil((target - actual) / weeklyRate);
+  const end = Math.min(week, reportingWeek + 52);
+  return { week, points: Array.from({ length: end - reportingWeek + 1 }, (_, i) => ({
+    week: reportingWeek + i, value: Math.min(target, actual + i * weeklyRate),
+  })) };
+}
+
 export function managementAttention(data, deliverables, tickets, families, context) {
   const items = [];
   const ticketById = new Map(tickets.map((ticket) => [ticket.id, ticket]));

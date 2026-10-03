@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agingBucket, deliverableState, dependencyState, isOpenTicket, percentile, ticketAge } from "../src/domain.js";
+import { agingBucket, deliverableState, dependencyState, forecastCatchUp, isOpenTicket, percentile, ticketAge } from "../src/domain.js";
+
+test("forecast reaches planned scope without changing measured actuals", () => {
+  const result = forecastCatchUp(1933, 2295, 140.25, 40);
+  assert.equal(result.week, 43);
+  assert.equal(result.points[0].value, 1933);
+  assert.equal(result.points.at(-1).value, 2295);
+  assert.equal(forecastCatchUp(1933, 2295, 0, 40).week, null);
+  assert.deepEqual(forecastCatchUp(2295, 2295, 10, 40).points, []);
+});
 
 const context = { reportingWeek: 40, openTicketIdsByFamily: new Map([["FAM-1", [76286]], ["FAM-2", []]]) };
 

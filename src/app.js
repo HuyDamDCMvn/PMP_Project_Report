@@ -1,10 +1,15 @@
 import "./styles.css";
+import { aggregateMidp, midpWeeklyActual, ticketSystem } from "./midp.js";
+import { matchesIssueFilters, personName, samePerson, isoWeekKey } from "./issues.js";
+import { renderFamilyAnalysis } from "./issues-view.js";
+import { familyOutcome, uploadedFamilyRows, uploadedFamilyCohort } from "./family-outcomes.js";
 import {
   agingBucket,
   buildContext,
   deliverableState,
   dependencyState,
   groupCount,
+  forecastCatchUp,
   isOpenTicket,
   managementAttention,
   percentile,
@@ -13,24 +18,26 @@ import {
 
 const PAGE_META = {
   overview: ["Executive Overview", "Project health, current delivery evidence and management action."],
-  tidp: ["MIDP / TIDP Delivery Control", "Weekly plan control with explicit completion-evidence boundaries."],
-  tickets: ["Annotation Ticket Control", "Operational backlog, aging, ownership and throughput."],
-  families: ["Family Readiness", "Uploaded content coverage and its relationship to planned RFA work."],
-  dependencies: ["Cross-data Dependencies", "Traceable TIDP → family → ticket → owner relationships."],
-  team: ["Team & Resource", "Workload evidence for allocation decisions, not performance scoring."],
+  tidp: ["Master Information Delivery Plan", "Master delivery plan by work package and lot."],
+  team: ["Issues & Productivity", "Issues and productivity for uploaded Families."],
   quality: ["Data Quality", "Missing evidence, source contradictions and unsupported KPIs."],
 };
 
 const state = {
-  page: "overview",
+  page: "tidp",
   filters: { system: "", owner: "", workType: "", status: "", search: "" },
   tablePage: 1,
   teamMetric: "deliverables",
+  familyAxisStep: 100,
+  collapsed: {},
 };
 
 let data;
 let context;
 let lookup;
+const pieDetails = new Map();
+let pieDetailSelection = null;
+let pieDetailTrigger = null;
 
 const escapeHtml = (value) => String(value ?? "—").replace(/[&<>'"]/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
@@ -40,6 +47,7 @@ const pct = (value) => `${Math.round((value || 0) * 100)}%`;
 const fmtDate = (value) => value ? new Intl.DateTimeFormat("en-GB").format(new Date(`${value}T12:00:00`)) : "—";
 const avg = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+const hourClass = (ticket) => ["Positive", "Re-Assessment"].includes(ticket.active) ? "Positive" : ticket.active;
 
 function createLookup() {
   const ticketById = new Map(data.tickets.map((item) => [item.id, item]));
@@ -55,16 +63,19 @@ function createLookup() {
 }
 
 function appShell() {
-  const nav = Object.entries(PAGE_META).map(([key, [label]], index) => `
-    <button data-nav="${key}" class="${state.page === key ? "active" : ""}">
-      <span class="nav-index">${String(index + 1).padStart(2, "0")}</span><span>${label.replace("MIDP / TIDP Delivery Control", "MIDP / TIDP").replace("Annotation Ticket Control", "Annotation Tickets").replace("Cross-data Dependencies", "Dependencies").replace("Team & Resource", "Team & Resource")}</span>
-    </button>`).join("");
+  const nav = [["tidp", "00"], ["overview", "01"], ["team", "03"], ["quality", "05"]].map(([key, number]) => {
+    const label = key === "tidp" ? "MIDP / TIDP" : PAGE_META[key][0];
+    return `
+    <button data-nav="${key}" class="${state.page === key ? "active" : ""}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
+      <span class="nav-index">${number}</span><span>${label.replace("MIDP / TIDP Delivery Control", "MIDP / TIDP").replace("Annotation Ticket Control", "Annotation Tickets").replace("Cross-data Dependencies", "Dependencies").replace("Team & Resource", "Team & Resource")}</span>
+    </button>`;
+  }).join("");
   return `
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand"><div class="brand-mark"><img src="${import.meta.env.BASE_URL}logo.svg" alt="DCMvn logo"></div><div><strong>Project Control</strong><span>BIM · DIGITAL DELIVERY</span></div></div>
+        <div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}logo.svg" alt="DCMvn logo"></div>
         <nav class="nav">${nav}</nav>
-        <div class="source-note">Snapshot ${fmtDate(data.meta.asOf)}<br>Reporting week CW${data.meta.reportingWeek}<br>3 controlled sources</div>
+        <div class="source-note">Snapshot has been captured since 16:00 - 30.09.2026</div>
       </aside>
       <div class="workspace">
         ${topbar()}
@@ -79,50 +90,103 @@ function options(values, selected, emptyLabel = "All") {
 }
 
 function topbar() {
-  const owners = unique([...data.deliverables.map((item) => item.owner), ...data.tickets.map((item) => item.handler)]);
-  const statuses = unique(data.tickets.map((item) => item.status));
   return `<header class="topbar">
     <div class="project-pill"><strong>${escapeHtml(data.meta.project)}</strong><span>CW${data.meta.reportingWeek} · as of ${fmtDate(data.meta.asOf)}</span></div>
-    <div class="filter-control"><label>System</label><select data-filter="system">${options(unique(data.deliverables.map((item) => item.system)), state.filters.system)}</select></div>
-    <div class="filter-control"><label>Responsible</label><select data-filter="owner">${options(owners, state.filters.owner)}</select></div>
-    <div class="filter-control"><label>Work type</label><select data-filter="workType">${options(unique([...data.deliverables.map((item) => item.workType), ...data.tickets.map((item) => item.workType)]), state.filters.workType)}</select></div>
-    <div class="filter-control"><label>Ticket status</label><select data-filter="status">${options(statuses, state.filters.status)}</select></div>
-    <div class="filter-control search"><label>Search</label><input data-filter="search" value="${escapeHtml(state.filters.search)}" placeholder="ID, title, family…"></div>
-    <button class="button" id="reset-filters">Reset filters</button>
   </header>`;
 }
 
 function filtered() {
   const f = state.filters;
   const term = f.search.toLowerCase().trim();
-  const deliverables = data.deliverables.filter((item) =>
+  let deliverables = data.deliverables.filter((item) =>
+    (!f.upload || (item.familyKey && (f.upload === "Uploaded" ? Boolean(item.familyId) : !item.familyId))) &&
     (!f.system || item.system === f.system) &&
-    (!f.owner || item.owner === f.owner) &&
+    (!f.owner || samePerson(item.owner, f.owner) || (item.familyId && lookup.familyById.get(item.familyId)?.ticketIds.some(id => samePerson(lookup.ticketById.get(id)?.handler, f.owner)))) &&
     (!f.workType || item.workType === f.workType) &&
     (!term || `${item.id} ${item.title} ${item.system} ${item.owner}`.toLowerCase().includes(term))
   );
   const allowedFamilyIds = new Set(deliverables.map((item) => item.familyId).filter(Boolean));
-  const families = data.families.filter((item) =>
-    (!f.system || allowedFamilyIds.has(item.id)) &&
-    (!f.owner || item.uploader === f.owner || item.ticketIds.some((id) => lookup.ticketById.get(id)?.handler === f.owner)) &&
+  let families = data.families.filter((item) =>
+    (!f.uploadWeek || isoWeekKey(item.end) === f.uploadWeek) &&
+    (!f.uploader || (item.uploader || "Unassigned") === f.uploader) &&
+    (!f.familyOutcome || familyOutcome(item) === f.familyOutcome) &&
+    (!(f.system || f.upload) || allowedFamilyIds.has(item.id)) &&
+    (!f.owner || samePerson(item.uploader, f.owner) || item.ticketIds.some((id) => samePerson(lookup.ticketById.get(id)?.handler, f.owner))) &&
     (!term || `${item.id} ${item.name} ${item.category} ${item.uploader} ${item.ticketIds.join(" ")}`.toLowerCase().includes(term))
   );
   const allowedTicketIds = new Set(families.flatMap((item) => item.ticketIds));
   const tickets = data.tickets.filter((item) =>
-    (!f.system || allowedTicketIds.has(item.id)) &&
-    (!f.owner || item.handler === f.owner) &&
+    matchesIssueFilters(item, f, data.meta.asOf) &&
+    (!f.reporter || (item.reporter || "Unknown reporter") === f.reporter) &&
+    (!f.active || hourClass(item) === f.active) &&
+    (!f.system || allowedTicketIds.has(item.id) || ticketSystem(item.summary) === f.system) &&
+    (!f.upload || allowedTicketIds.has(item.id)) &&
+    (!(f.familyOutcome || f.uploadWeek || f.uploader) || allowedTicketIds.has(item.id)) &&
+    (!f.owner || samePerson(item.handler, f.owner)) &&
     (!f.workType || item.workType === f.workType) &&
     (!f.status || item.status === f.status) &&
     (!term || `${item.id} ${item.summary} ${item.handler} ${item.reporter}`.toLowerCase().includes(term))
   );
+  if (f.active || f.status || f.reporter || f.issueState || f.aging || f.activityWeek || f.owner || f.workType) {
+    const ids = new Set(tickets.map((item) => item.id));
+    families = families.filter((item) => item.ticketIds.some((id) => ids.has(id)));
+    const familyIds = new Set(families.map((item) => item.id));
+    deliverables = deliverables.filter((item) => familyIds.has(item.familyId) || (!item.familyKey && tickets.some(ticket => ticket.workType === item.workType && ticketSystem(ticket.summary) === item.system)));
+  }
+  if (f.familyOutcome || f.uploadWeek || f.uploader) {
+    const familyIds = new Set(families.map(item => item.id));
+    deliverables = deliverables.filter(item => familyIds.has(item.familyId));
+  }
   return { deliverables, tickets, families };
 }
 
 function heading() {
-  const [title, subtitle] = PAGE_META[state.page];
+  const [title] = PAGE_META[state.page];
   const active = Object.entries(state.filters).filter(([, value]) => value);
-  return `<div class="page-heading"><div><p class="eyebrow">PMP Project Report</p><h1>${title}</h1><p class="subtitle">${subtitle}</p></div><div class="evidence-badge">Evidence date · ${fmtDate(data.meta.asOf)}</div></div>
-    ${active.length ? `<div class="filter-chips">${active.map(([key, value]) => `<span class="chip">${escapeHtml(key)}: ${escapeHtml(value)}</span>`).join("")}</div>` : ""}`;
+  return `<div class="page-heading"><div><p class="eyebrow">DCMvn_Annotation Project Overview Report</p><h1>${title}</h1></div></div>
+    ${active.length ? `<div class="filter-chips">${active.map(([key, value]) => `<button class="chip" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(key === "owner" ? personName(value) : value)} ×</button>`).join("")}<button class="button" id="reset-filters">Reset Filters</button></div>` : ""}`;
+}
+
+function piePanel(id, title, slices, unit, source) {
+  pieDetails.set(id, { title, unit, source });
+  const total = slices.reduce((sum, item) => sum + item.value, 0);
+  const number = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  let offset = 0;
+  const anchors = [];
+  // Separate the tiny work-type slices instead of clustering their anchors.
+  const ringSlices = id === "positive-work-type" && slices.length === 6
+    ? [0, 4, 1, 3, 2, 5].map((index) => slices[index]) : slices;
+  const marks = ringSlices.map((item) => {
+    const length = total ? item.value / total * 100 : 0;
+    if (item.value > 0) {
+      const angle = (offset + length / 2) / 100 * Math.PI * 2 - Math.PI / 2;
+      anchors.push({ ...item, share: length, x: 21 + 20.5 * Math.cos(angle), y: 21 + 20.5 * Math.sin(angle), right: Math.cos(angle) >= 0 });
+    }
+    const point = (radius, percent) => {
+      const radians = percent / 100 * Math.PI * 2;
+      return `${21 + radius * Math.cos(radians)},${21 + radius * Math.sin(radians)}`;
+    };
+    const arcLength = Math.min(length, 99.9999);
+    const large = arcLength > 50 ? 1 : 0;
+    const path = `M${point(20.4155, offset)} A20.4155,20.4155 0 ${large} 1 ${point(20.4155, offset + arcLength)} L${point(11.4155, offset + arcLength)} A11.4155,11.4155 0 ${large} 0 ${point(11.4155, offset)} Z`;
+    const mark = length > 0 ? `<path class="donut-slice" d="${path}" fill="${item.color}" role="button" tabindex="0" data-pie-detail="${id}" data-slice-filter="${item.filter}" data-slice-value="${escapeHtml(item.label)}" aria-label="${escapeHtml(`${title}: ${item.label}, ${number(item.value)} ${unit}. Open details`)}"><title>${escapeHtml(`${item.label}: ${number(item.value)} ${unit} — click for details`)}</title></path>` : "";
+    offset += length;
+    return mark;
+  }).join("");
+  const labelNames = { "Revise the RFA library": "RFA library", "Framework deliverables": "Framework deliverables", "Sample Model + Output Data": "Sample model + output", "Output Checklists": "Output checklists", "Create Revit templates for each LPH": "Revit templates", "Export layouts to Revizto & 3D Review": "Revizto + 3D review" };
+  const labels = [false, true].map((right) => {
+    const side = anchors.filter((item) => item.right === right).sort((a, b) => a.y - b.y);
+    return side.map((item, index) => {
+      const y = side.length === 1 ? item.y : -6 + index * 54 / (side.length - 1);
+      const end = right ? 50 : -14;
+      const textX = right ? 51 : -15;
+      const share = item.share < .1 ? "<0.1" : item.share.toFixed(1);
+      const laneDistance = y < item.y ? 1 + index * 1.5 : 10 - index * 1.5;
+      const lane = right ? 42 + laneDistance : -laneDistance;
+      return `<g class="donut-label"><polyline points="${item.x},${item.y} ${lane},${item.y} ${lane},${y} ${end},${y}"/><circle cx="${item.x}" cy="${item.y}" r=".5" fill="${item.color}"/><text x="${textX}" y="${y - 1}" text-anchor="${right ? 'start' : 'end'}">${escapeHtml(labelNames[item.label] || item.label)}<tspan x="${textX}" dy="3.5">${number(item.value)} · ${share}%</tspan></text></g>`;
+    }).join("");
+  }).join("");
+return `<details class="panel pie-panel" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span>Details</span></summary><div class="pie-layout"><div class="donut-wrap"><svg viewBox="-46 -10 134 62" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button data-set-filter="${item.filter}" data-filter-value="${item.label}" class="pie-key ${state.filters[item.filter] === item.label ? "selected" : ""}" aria-pressed="${state.filters[item.filter] === item.label}"><i style="background:${item.color}"></i><span>${item.label}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div><details class="chart-source"><summary>Source and definition</summary><p>${source}</p><p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p></details></details>`;
 }
 
 function kpi(label, value, note, tone = "", action = "") {
@@ -166,6 +230,52 @@ function dataTable({ title, subtitle, columns, rows, kind, exportName = "records
   return `<section class="panel"><div class="panel-header"><div><h2>${title}</h2><p>${subtitle}</p></div><button class="button" data-export="${exportName}" data-export-kind="${kind}">Export CSV</button></div><div class="table-tools"><span>${fmt(rows.length)} records · showing ${rows.length ? start + 1 : 0}–${Math.min(start + pageSize, rows.length)}</span><span>Click a row for source trace</span></div><div class="table-wrap"><table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></div><div class="pagination"><button data-page-step="-1" ${state.tablePage === 1 ? "disabled" : ""}>←</button><span>Page ${state.tablePage} / ${totalPages}</span><button data-page-step="1" ${state.tablePage === totalPages ? "disabled" : ""}>→</button></div></section>`;
 }
 
+function familyProgressChart(deliverables, families) {
+  const names = new Map();
+  deliverables.filter((item) => item.familyKey && item.workType === "Revise the RFA library").forEach((item) => {
+    const old = names.get(item.familyKey);
+    const first = item.plannedStartWeek;
+    names.set(item.familyKey, { first: first ? Math.min(first, old?.first || first) : old?.first, uploaded: Boolean(item.familyId) || Boolean(old?.uploaded) });
+  });
+  const uploadDates = new Map();
+  families.filter((item) => names.has(item.key) && item.end && /^\d{4}-\d{2}-\d{2}$/.test(item.end)).forEach((item) => {
+    if (!uploadDates.has(item.key) || item.end < uploadDates.get(item.key)) uploadDates.set(item.key, item.end);
+  });
+  // ISO weeks in 2026 start on Monday; CW01 starts 29 December 2025.
+  const weekEnd = (week) => new Date(Date.UTC(2025, 11, 29 + week * 7 - 1)).toISOString().slice(0, 10);
+  const rows = Array.from({ length: 38 }, (_, i) => {
+    const week = i + 5;
+    const cutoff = weekEnd(week) < data.meta.asOf ? weekEnd(week) : data.meta.asOf;
+    return { week, count: [...names.values()].filter((item) => item.first && item.first <= week).length,
+      actual: week > data.meta.reportingWeek ? null : [...uploadDates.values()].filter((date) => date <= cutoff).length };
+  });
+  const actual = rows.find((row) => row.week === data.meta.reportingWeek).actual;
+  const completedWeek = weekEnd(data.meta.reportingWeek) > data.meta.asOf ? data.meta.reportingWeek - 1 : data.meta.reportingWeek;
+  const cumulativeAt = (week) => [...uploadDates.values()].filter((date) => date <= weekEnd(week)).length;
+  const weeklyRate = (cumulativeAt(completedWeek) - cumulativeAt(completedWeek - 4)) / 4;
+  const target = rows.at(-1).count;
+  const forecast = forecastCatchUp(actual, target, weeklyRate, data.meta.reportingWeek);
+  const endWeek = Math.max(42, forecast.points.at(-1)?.week || 42);
+  while (rows.at(-1).week < endWeek) rows.push({ week: rows.at(-1).week + 1, count: target, actual: null });
+  const weekLabel = (week) => week <= 53 ? `CW${String(week).padStart(2, "0")}` : `CW${String(week - 53).padStart(2, "0")}/2027`;
+  const forecastMessage = forecast.week == null ? "Forecast unavailable: no uploads in the last four complete CWs." : actual >= target ? "Plan already reached." : `Forecast catch-up: ${weekLabel(forecast.week)} · ${fmt(weeklyRate)} families/week`;
+  const axisStep = state.familyAxisStep;
+  const max = Math.max(axisStep, Math.ceil(names.size / axisStep) * axisStep);
+  const ticks = Array.from({ length: Math.round(max / axisStep) + 1 }, (_, i) => i * axisStep);
+  const plotHeight = Math.max(480, (ticks.length - 1) * 20);
+  const bottom = 80 + plotHeight;
+  const canvasWidth = Math.max(1600, 150 + (endWeek - 5) * 46);
+  const x = (w) => 90 + (w - 5) / (endWeek - 5) * (canvasWidth - 150);
+  const y = (v) => bottom - v / max * plotHeight;
+  const detailRows = [...names.entries()].map(([key, item]) => {
+    const source = deliverables.find((r) => r.familyKey === key);
+    return { id: source.id, title: source.title, system: source.system, owner: source.owner, plannedStartWeek: item.first, end: uploadDates.get(key) || "" };
+  });
+  pieDetails.set("family-progress", { title: "Cumulative Family Progress", rows: detailRows, weekEnd });
+  const valueAction = (series, week, value) => value > 0 ? `role="button" tabindex="0" data-progress-detail="${series}" data-progress-week="${week}" aria-label="${series} CW${week}: ${fmt(value)} families. Open details"` : 'aria-disabled="true"';
+return panel("Cumulative Family Progress by CW", `Unique families · CW05–${weekLabel(endWeek)}/2026`, `<div class="panel-body family-progress"><div class="progress-legend"><span>Plan</span><span class="actual">Actual</span><span class="forecast">Forecast</span></div><p class="progress-forecast-summary">${escapeHtml(forecastMessage)}</p><label class="progress-axis-control" for="family-axis-step">Y-axis step (families)<input id="family-axis-step" type="number" min="10" max="5000" step="1" value="${axisStep}" /></label><div class="progress-scroll" tabindex="0" aria-label="Family progress chart"><svg style="min-width:${canvasWidth}px" viewBox="0 0 ${canvasWidth} ${bottom + 85}" role="group" aria-label="Cumulative family plan; ${actual} uploaded matches at CW${data.meta.reportingWeek}. Actual cumulative uploads by source End Date.">${ticks.map((tick) => `<line x1="90" x2="${canvasWidth - 60}" y1="${y(tick)}" y2="${y(tick)}" class="progress-grid"/><text x="80" y="${y(tick) + 4}" text-anchor="end">${fmt(tick)}</text>`).join('')}${rows.filter((r) => r.week !== data.meta.reportingWeek).map((r) => `<line x1="${x(r.week)}" x2="${x(r.week)}" y1="60" y2="${bottom}" class="progress-week-grid"/>`).join('')}<line x1="${x(data.meta.reportingWeek)}" x2="${x(data.meta.reportingWeek)}" y1="45" y2="${bottom}" class="progress-current"/><polyline points="${rows.map((r) => `${x(r.week)},${y(r.count)}`).join(' ')}" class="progress-plan"/>${rows.map((r) => `<circle cx="${x(r.week)}" cy="${y(r.count)}" r="3" class="progress-plan-dot"/>`).join('')}${rows.map((r, i) => `<text ${valueAction("Plan", r.week, r.count)} class="progress-value progress-plan-value" x="${x(r.week)}" y="${y(r.count) - (i % 2 ? 42 : 56)}" text-anchor="middle">${fmt(r.count)}</text>`).join('')}${forecast.points.length ? `<polyline points="${forecast.points.map((r) => `${x(r.week)},${y(r.value)}`).join(' ')}" class="progress-forecast-line"/><circle cx="${x(forecast.points.at(-1).week)}" cy="${y(forecast.points.at(-1).value)}" r="5" class="progress-forecast-dot"/>` : ''}<polyline points="${rows.filter((r) => r.actual != null).map((r) => `${x(r.week)},${y(r.actual)}`).join(' ')}" class="progress-actual-line"/>${rows.filter((r) => r.actual != null).map((r) => `<circle cx="${x(r.week)}" cy="${y(r.actual)}" r="3" class="progress-actual"/>`).join('')}<rect x="${x(data.meta.reportingWeek) - 5}" y="${y(actual) - 5}" width="10" height="10" class="progress-actual"/>${rows.filter((r) => r.actual != null).map((r, i) => `<text ${valueAction("Actual", r.week, r.actual)} class="progress-value" x="${x(r.week)}" y="${y(r.actual) - (i % 2 ? 12 : 26)}" text-anchor="middle">${fmt(r.actual)}</text>`).join('')}${rows.map((r) => `<text x="${x(r.week)}" y="${bottom + 28}" text-anchor="middle">${weekLabel(r.week).replace("CW", "")}</text>`).join('')}<text x="${canvasWidth / 2}" y="${bottom + 65}" text-anchor="middle">CW · 2026</text><text x="20" y="${60 + plotHeight / 2}" transform="rotate(-90 20 ${60 + plotHeight / 2})" text-anchor="middle">Cumulative family count</text></svg></div><details class="chart-source"><summary>Source and weekly values</summary><p>TIDP_Combined: unique normalized RFA names counted at their first scheduled CW, an estimate of planned scope, not completed output. Family_vs_Tickets: exact uploaded match restricted to DCMvn_Annotation Project. End Date is the user-approved actual upload milestone. Snapshot ${fmtDate(data.meta.asOf)}. Forecast is a scenario, not measured uploads: average net uploads over the last four complete ISO weeks (${weekLabel(completedWeek - 3)}–${weekLabel(completedWeek)}), ${fmt(weeklyRate)} families/week. The partial current week is excluded from the rate. Projection starts from the CW${data.meta.reportingWeek} snapshot and assumes this rate continues and final planned scope stays at ${fmt(target)} families. The last planned value is held flat beyond CW42; it is not a new approved schedule. ${escapeHtml(forecastMessage)}.</p><div class="table-wrap"><table><thead><tr><th>CW</th><th>Cumulative plan</th><th>Actual</th><th>Forecast</th></tr></thead><tbody>${rows.map((r) => `<tr><td>CW${r.week}</td><td>${fmt(r.count)}</td><td>${r.actual == null ? 'Future — not reported' : fmt(r.actual)}</td><td>${forecast.points.find((point) => point.week === r.week && r.week > data.meta.reportingWeek) ? fmt(Math.round(forecast.points.find((point) => point.week === r.week).value)) : '—'}</td></tr>`).join('')}</tbody></table></div></details></div>`, "family-progress-panel");
+}
+
 function overviewView(scoped) {
   const { deliverables, tickets, families } = scoped;
   const open = tickets.filter(isOpenTicket);
@@ -175,29 +285,29 @@ function overviewView(scoped) {
   const matched = rfa.filter((item) => item.familyId);
   const critical = open.filter((item) => ticketAge(item, data.meta.asOf) > data.config.ticketAgingCriticalDays);
   const attention = managementAttention(data, deliverables, tickets, families, context);
-  const currentBySystem = groupCount(current, (item) => item.system);
-  const aging = groupCount(open, (item) => agingBucket(item, data.meta.asOf));
+  const familyKeys = new Map(rfa.map((item) => [item.familyKey, Boolean(item.familyId)]).filter(([key]) => key));
+  const uploadedCount = [...familyKeys.values()].filter(Boolean).length;
+  const hours = ["Positive", "Negative"].map((label, index) => ({ label, value: tickets.filter((item) => hourClass(item) === label).reduce((sum, item) => sum + Number(item.actualHours || 0), 0), filter: "active", color: ["var(--green)", "var(--red)"][index] }));
+  const ticketCounts = ["Positive", "Negative"].map((label, index) => ({ label, value: tickets.filter((item) => hourClass(item) === label).length, filter: "active", color: ["var(--green)", "var(--red)"][index] }));
+  const positiveTickets = tickets.filter((item) => hourClass(item) === "Positive");
+  const workHours = new Map();
+  positiveTickets.forEach((item) => workHours.set(item.workType, (workHours.get(item.workType) || 0) + Number(item.actualHours || 0)));
+  const workColors = ["#1f5a94", "#237a57", "#b26a00", "#7849a3", "#187e85", "#b42318", "#596579"];
+  const positiveByWork = [...workHours].sort((a, b) => b[1] - a[1]).map(([label, value], index) => ({ label, value, filter: "workType", color: workColors[index % workColors.length] }));
+  const positiveByReporter = [...groupCount(positiveTickets, (item) => item.reporter || "Unknown reporter")]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value], index) => ({ label, value, filter: "reporter", color: workColors[index % workColors.length] }));
   return `${heading()}
-    <div class="notice">Completion and contractual due dates are not present in all three sources. Evidence gaps are shown explicitly; no green status is inferred from missing data.</div>
-    <div class="kpi-grid">
-      ${kpi("TIDP work items", fmt(deliverables.length), `${fmt(current.length)} active in CW${data.meta.reportingWeek}`, "", "tidp")}
-      ${kpi("Current-week plan", fmt(current.length), `${fmt(groupCount(current, (item) => item.system).size)} systems represented`, "delta", "tidp-current")}
-      ${kpi("Past plan · unverified", fmt(past.length), "Actual finish is not supplied", "", "tidp-past")}
-      ${kpi("Open annotation tickets", fmt(open.length), `${fmt(critical.length)} older than 30 days`, "", "tickets-open")}
-      ${kpi("TIDP family coverage", pct(matched.length / Math.max(rfa.length, 1)), `${fmt(rfa.length - matched.length)} no exact uploaded match`, "", "families")}
+    <div class="grid-2 overview-charts">
+      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: "Not uploaded", value: familyKeys.size - uploadedCount, color: "var(--amber)", filter: "upload" }], "families in TIDP", "Unique normalized names from TIDP_Combined / Revise the RFA library, matched to Family_vs_Tickets where Project Name = DCMvn_Annotation Project. Not uploaded means no exact name match in the supplied upload snapshot. Rebuild: python scripts/build_dashboard_data.py.")}
+      ${piePanel("ticket-hours", "Annotation Project Ticket Hours", hours, "total hours", `Matrix / Actual Hours summed once per ticket. Dashboard Positive includes source Active = Positive or Re-Assessment, per the approved project rule. Negative retains source Active = Negative. Missing hours: ${tickets.filter((item) => item.actualHours == null).length} tickets, excluded from hours.`)}
     </div>
-    <div class="health-grid">
-      ${healthItem("Schedule health", `${fmt(past.length)} need confirmation`, past.length ? "attention" : "healthy", "tidp")}
-      ${healthItem("Ticket health", `${fmt(critical.length)} aging-critical`, critical.length ? "critical" : "healthy", "tickets")}
-      ${healthItem("Family readiness", `${pct(matched.length / Math.max(rfa.length, 1))} exact coverage`, matched.length / Math.max(rfa.length, 1) < .9 ? "attention" : "healthy", "families")}
-      ${healthItem("Resource load", `${fmt(open.length)} open`, open.length ? "attention" : "healthy", "team")}
-      ${healthItem("Data quality", `${fmt(Object.values(data.quality).reduce((sum, value) => sum + value, 0))} flags`, "attention", "quality")}
+    ${piePanel("positive-work-type", "Positive Hours by Work Type", positiveByWork, "positive hours", "Matrix / Actual Hours grouped by Work Type, with Active = Positive or Re-Assessment. Each ticket belongs to its primary Work Type and is counted once. Selecting a Work Type filters related dashboard records.")}
+    <div class="kpi-grid secondary-kpis">
+      ${piePanel("ticket-count", "Annotation Project Ticket Count", ticketCounts, "total tickets", "Annotation_Ticket_User_Matrix_Checked.xlsx / Matrix: count each Ticket ID once across all statuses, not only open tickets. Positive includes source Active = Positive or Re-Assessment; Negative retains source Active = Negative. Legend selections share the dashboard Active filter.")}
+      ${piePanel("positive-reporters", "Positive Tickets by Reporter", positiveByReporter, "positive tickets", "Annotation_Ticket_User_Matrix_Checked.xlsx / Matrix: count each Ticket ID once, grouped by Reporter, across all statuses. Positive includes source Active = Positive or Re-Assessment. Blank Reporter is shown as Unknown reporter. Selecting a reporter filters all related dashboard records.")}
     </div>
-    ${panel("Management Attention", "Highest-impact, evidence-backed items under current filters", `<div class="attention-list">${attention.length ? attention.map((item) => `<button class="attention-item" data-open-kind="${item.kind}" data-open-id="${item.id}"><span class="rule">${item.rule}</span><span><strong>${escapeHtml(item.issue)}</strong><span class="attention-meta">${escapeHtml(item.impact)}</span></span><span><strong>${escapeHtml(item.action)}</strong><span class="attention-meta">Owner · ${escapeHtml(item.owner)}</span></span><span>${statusBadge(item.due)}<br><span class="attention-meta">${escapeHtml(item.related)}</span></span></button>`).join("") : `<div class="empty">No management-attention item matches the current filters.</div>`}</div>`, "attention-panel")}
-    <div class="grid-2">
-      ${panel("Current-week delivery by system", `CW${data.meta.reportingWeek} planned work`, `<div class="panel-body">${barList(currentBySystem, { filter: "system" })}</div>`)}
-      ${panel("Open-ticket aging", "Aging is used because ticket due dates are absent", `<div class="panel-body">${barList(aging, { color: "amber" })}</div>`)}
-    </div>`;
+    ${familyProgressChart(deliverables, families)}`;
 }
 
 function timeline(deliverables) {
@@ -208,7 +318,47 @@ function timeline(deliverables) {
   return `<div class="panel-body timeline"><div class="timeline-grid"><div class="timeline-cell label">System</div>${weeks.map((week) => `<div class="timeline-cell ${week < data.meta.reportingWeek ? "past" : ""} ${week === data.meta.reportingWeek ? "current" : ""}">CW${week}</div>`).join("")}${systems.map((system) => `<div class="timeline-cell label">${escapeHtml(system)}</div>${weeks.map((week) => `<div class="timeline-cell ${week < data.meta.reportingWeek ? "past" : ""} ${week === data.meta.reportingWeek ? "current" : ""}">${fmt(counts.get(`${system}-${week}`))}</div>`).join("")}`).join("")}</div></div>`;
 }
 
-function tidpView({ deliverables }) {
+function tidpView({ deliverables, tickets }) {
+  return midpView(deliverables, tickets);
+}
+
+function midpView(deliverables, tickets) {
+  const groups = aggregateMidp(deliverables);
+  const allWeeks = data.deliverables.flatMap((r) => r.weeks.map((w) => w.week));
+  const first = Math.min(...allWeeks), last = Math.max(...allWeeks);
+  const weeks = Array.from({ length: last - first + 1 }, (_, i) => first + i);
+  const cell = (group, week) => {
+    const entry = group.weeks.get(week);
+    return `<td class="midp-week ${week === data.meta.reportingWeek ? "midp-current" : ""}">${entry ? `<button class="midp-mark" data-midp-detail="${escapeHtml(group.key)}" data-midp-week="${week}" aria-label="${escapeHtml(group.workType)} · ${escapeHtml(group.batch)} · CW${week}: ${entry.ids.size} planned items" title="${escapeHtml([...entry.activities].join(', '))}">${entry.ids.size}</button>` : ""}</td>`;
+  };
+  groups.forEach((group) => pieDetails.set(`midp:${group.key}`, { title: `MIDP · ${group.workType} · ${group.team} / ${group.batch}`, rows: group.records }));
+  const actualCell = (group) => {
+    const rows = midpWeeklyActual(group, data.families, data.meta.asOf, tickets);
+
+    pieDetails.set(`midp:actual:${group.key}`, { title: `MIDP Actual · ${group.workType} · ${group.batch}`, rows });
+    return weeks.map(week => {
+      const count = rows.filter(row => row.actualWeek === week).length;
+      return `<td class="midp-week ${week === data.meta.reportingWeek ? "midp-current" : ""}">${week > data.meta.reportingWeek ? "" : count ? `<button class="midp-mark" data-midp-detail="actual:${escapeHtml(group.key)}" data-midp-week="${week}" data-midp-series="actual" aria-label="CW${week}: ${count} actual ${group.workType === "Revise the RFA library" ? "uploads" : "completed tickets"}">${count}</button>` : ""}</td>`;
+    }).join("");
+  };
+  const packageOrder = [
+    "Framework deliverables",
+    "Revise the RFA library",
+    "Create Revit templates for each LPH",
+    "Sample Model + Output Data",
+    "Output Checklists",
+    "Export layouts to Revizto & 3D Review",
+    "Lesson Learned",
+  ];
+  const packages = unique(groups.map((g) => g.workType)).sort((a, b) => {
+    const rank = value => packageOrder.includes(value) ? packageOrder.indexOf(value) : packageOrder.length;
+    return rank(a) - rank(b) || a.localeCompare(b);
+  });
+  return `${heading()}<div class="midp-context">${Object.entries(state.filters).filter(([,value]) => value).map(([key,value]) => `<button class="button" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(value)} ×</button>`).join("")}</div>
+  ${panel("Master Information Delivery Plan", "", `<div class="panel-body">${packages.length ? packages.map((type) => `<details class="midp-package" data-collapse="midp-${escapeHtml(type)}" ${state.collapsed[`midp-${type}`] ? "" : "open"}><summary>${escapeHtml(type)} · ${fmt(groups.filter(g => g.workType === type).reduce((sum,g) => sum + g.records.length,0))} items</summary><div class="table-wrap midp-scroll" tabindex="0" aria-label="${escapeHtml(type)} Gantt"><table class="midp-table"><thead><tr><th>Team / lot</th><th>Owner</th><th>Items</th><th>Series</th>${weeks.map(w => `<th class="midp-week ${w === data.meta.reportingWeek ? "midp-current" : ""}">CW${String(w).padStart(2,'0')}</th>`).join('')}</tr></thead><tbody>${groups.filter(g => g.workType === type).map(g => `<tr class="midp-actual"><th rowspan="2"><button data-set-filter="system" data-filter-value="${escapeHtml(g.records[0].system)}">${escapeHtml(g.team)} / ${escapeHtml(g.batch)}</button></th><td rowspan="2">${unique(g.records.map(r => r.owner)).map(owner => `<button data-set-filter="owner" data-filter-value="${escapeHtml(owner)}">${escapeHtml(owner)}</button>`).join('<br>')}</td><td rowspan="2">${g.records.length}</td><td class="midp-series">Actual</td>${actualCell(g)}</tr><tr class="midp-plan"><td class="midp-series">Plan</td>${weeks.map(w => cell(g,w)).join('')}</tr>`).join('')}</tbody></table></div></details>`).join('') : '<div class="empty">No planned records match the current filters.</div>'}</div>`, "midp-panel")}`;
+}
+
+function legacyTidpView({ deliverables }) {
   const states = groupCount(deliverables, (item) => deliverableState(item, context));
   const current = deliverables.filter((item) => item.currentActivity);
   const noMatch = deliverables.filter((item) => item.relationship === "Unlinked");
@@ -321,31 +471,15 @@ function heatmap(rows, weeks, metric) {
   return `<div class="panel-body heatmap"><div class="heatmap-grid"><div class="heat-cell label">Team member</div>${weeks.map((week) => `<div class="heat-cell ${week === data.meta.reportingWeek ? "level-1" : ""}">CW${week}</div>`).join("")}${rows.map((row) => `<div class="heat-cell label">${escapeHtml(row.name)}</div>${weeks.map((week) => `<div class="heat-cell level-${level(row.values[week] || 0)}" title="${escapeHtml(row.name)} · CW${week}: ${row.values[week] || 0} ${metric}">${row.values[week] || 0}</div>`).join("")}`).join("")}</div></div>`;
 }
 
-function teamView({ deliverables, tickets, families }) {
-  const weeks = Array.from({ length: 8 }, (_, index) => data.meta.reportingWeek - 5 + index);
-  const people = unique([...deliverables.map((item) => item.owner), ...tickets.map((item) => item.handler)]);
-  const rows = people.map((name) => ({ name, values: Object.fromEntries(weeks.map((week) => {
-    const deliverableCount = deliverables.filter((item) => item.owner === name && item.weeks.some((entry) => entry.week === week)).length;
-    const ticketCount = tickets.filter((item) => item.handler === name && item.created && Number(item.created.slice(6, 10).replace("-", "")) >= 0 && weekOfYear(item.created) === week).length;
-    return [week, state.teamMetric === "deliverables" ? deliverableCount : state.teamMetric === "tickets" ? ticketCount : deliverableCount + ticketCount];
-  })) })).filter((row) => Object.values(row.values).some(Boolean)).sort((a, b) => Object.values(b.values).reduce((x, y) => x + y, 0) - Object.values(a.values).reduce((x, y) => x + y, 0)).slice(0, 18);
-  const open = tickets.filter(isOpenTicket);
-  const byHandler = groupCount(open, (item) => item.handler || "Unassigned");
-  const criticalByHandler = groupCount(open.filter((item) => ticketAge(item, data.meta.asOf) > 30), (item) => item.handler || "Unassigned");
-  const threshold = percentile([...byHandler.values()], .75);
-  return `${heading()}<div class="notice">High workload is a capacity signal only. Complexity, availability and role are not present in the source and must be reviewed before reallocating work.</div>
-  <div class="kpi-grid">
-    ${kpi("People in filtered scope", fmt(people.length), "TIDP owners + ticket handlers")}
-    ${kpi("Open ticket load", fmt(open.length), "Across current handlers")}
-    ${kpi("75th percentile load", fmt(threshold), "Review threshold, not performance target")}
-    ${kpi("Critical aging load", fmt([...criticalByHandler.values()].reduce((a, b) => a + b, 0)), "Open tickets older than 30 days")}
-    ${kpi("Family upload owners", fmt(unique(families.map((item) => item.uploader)).length), "Uploader field coverage")}
-  </div>
-  <section class="panel"><div class="panel-header"><div><h2>Weekly workload heatmap</h2><p>Count of due/planned items by reporting week</p></div><select id="team-metric"><option value="deliverables" ${state.teamMetric === "deliverables" ? "selected" : ""}>Deliverables</option><option value="tickets" ${state.teamMetric === "tickets" ? "selected" : ""}>Tickets created</option><option value="combined" ${state.teamMetric === "combined" ? "selected" : ""}>Combined</option></select></div>${heatmap(rows, weeks, state.teamMetric)}</section>
-  <div class="grid-2">
-    ${panel("Open tickets by handler", "Click to filter; count indicates workload", `<div class="panel-body">${barList(byHandler, { filter: "owner", limit: 12 })}</div>`)}
-    ${panel("Aging-critical tickets by handler", "Open tickets older than 30 days", `<div class="panel-body">${barList(criticalByHandler, { color: "red", filter: "owner", limit: 12 })}</div>`)}
-  </div>`;
+function familyAnalysisView(scoped) {
+  const { families: uploaded, tickets } = uploadedFamilyCohort(scoped.families, scoped.tickets, data.meta.asOf);
+  const familyChart = piePanel("family-outcomes", "Uploaded Families", [
+    { label: "One pass", value: uploaded.filter(item => familyOutcome(item) === "One pass").length, color: "var(--green)", filter: "familyOutcome" },
+    { label: "Returned", value: uploaded.filter(item => familyOutcome(item) === "Returned").length, color: "var(--red)", filter: "familyOutcome" },
+    { label: "Unclassified", value: uploaded.filter(item => familyOutcome(item) === "Unclassified").length, color: "var(--grey)", filter: "familyOutcome" },
+  ].filter(slice => slice.label !== "Unclassified" || slice.value > 0), "uploaded families", "Rework_Outcome from Family_vs_Tickets. One pass = One_pass; Returned = Returned; blank outcomes remain Unclassified. Each uploaded Family is counted once through the reporting snapshot, within DCMvn_Annotation Project.");
+  return renderFamilyAnalysis({ tickets, families: uploaded, familyChart, asOf: data.meta.asOf, filters: state.filters, collapsed: state.collapsed,
+    panel, heading, escapeHtml, fmt, fmtDate, register: (id, meta) => pieDetails.set(id, meta) });
 }
 
 function weekOfYear(iso) {
@@ -386,11 +520,143 @@ function qualityView() {
   </div>`;
 }
 
+let chartSizes = {};
+try { chartSizes = JSON.parse(localStorage.getItem("pmp-chart-drag-sizes") || "{}"); } catch { /* Fall back to automatic sizing. */ }
+
+function applyComponentLayout() {
+  const root = document.querySelector("#page-content");
+  root.querySelectorAll(".panel").forEach((component, index) => {
+    const title = component.querySelector("h2")?.textContent || `Component ${index + 1}`;
+    const layoutScope = component.closest("[data-layout-scope]")?.dataset.layoutScope || state.page;
+    const key = `${layoutScope}:${component.dataset.collapse || title}`;
+    const inGrid = component.parentElement.matches(".grid-2,.secondary-kpis");
+    const wrapper = document.createElement("div");
+    wrapper.className = "auto-fit-component";
+    wrapper.style.setProperty("--component-span", component.dataset.collapse === "family-outcomes" ? "12" : inGrid || component.classList.contains("pie-panel") ? "6" : "12");
+    if (component.tagName === "SECTION") {
+      const toggle = document.createElement("button");
+      toggle.className = "button";
+      const collapseKey = `${key}:collapsed`;
+      const toggleCollapsed = () => {
+        const collapsed = Boolean(state.collapsed[collapseKey]);
+        component.classList.toggle("component-collapsed", collapsed);
+        toggle.textContent = collapsed ? "Expand" : "Collapse";
+        toggle.setAttribute("aria-expanded", String(!collapsed));
+      };
+      toggle.addEventListener("click", () => { state.collapsed[collapseKey] = !state.collapsed[collapseKey]; toggleCollapsed(); });
+      component.querySelector(".panel-header")?.append(toggle);
+      toggleCollapsed();
+    }
+    component.before(wrapper);
+    wrapper.append(component);
+    if (component.matches(".pie-panel, .issues-panel")) {
+      const layout = component.querySelector(".pie-layout, .panel-body");
+      const autoSpan = Number(wrapper.style.getPropertyValue("--component-span"));
+      const saved = chartSizes[key] || {};
+      const fit = (span, height) => {
+        wrapper.style.setProperty("--component-span", Math.max(4, Math.min(12, span)));
+        layout.style.height = height ? `${Math.max(200, Math.min(900, height))}px` : "";
+        layout.classList.toggle("user-sized-chart", Boolean(height));
+      };
+      fit(saved.span || autoSpan, saved.height);
+      const handle = document.createElement("button");
+      handle.className = "chart-resize-handle";
+      handle.textContent = "↘";
+      handle.setAttribute("aria-label", `Resize ${title}`);
+      handle.title = "Drag to resize. Arrow keys adjust size; Home or double-click restores auto fit.";
+      const persist = () => {
+        chartSizes[key] = { span: Number(wrapper.style.getPropertyValue("--component-span")), height: parseFloat(layout.style.height) || 0 };
+        try { localStorage.setItem("pmp-chart-drag-sizes", JSON.stringify(chartSizes)); } catch { /* Keep session preference. */ }
+      };
+      const resetSize = () => { fit(autoSpan, 0); persist(); };
+      let drag = null;
+      handle.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        drag = { x: event.clientX, y: event.clientY, span: Number(wrapper.style.getPropertyValue("--component-span")), height: layout.getBoundingClientRect().height, step: (component.closest(".dashboard-group-body") || root).clientWidth / 12 };
+      });
+      handle.addEventListener("pointermove", (event) => {
+        if (!drag) return;
+        const span = Math.round(drag.span + (event.clientX - drag.x) / drag.step);
+        fit(span, drag.height + event.clientY - drag.y);
+      });
+      handle.addEventListener("pointerup", () => { drag = null; persist(); });
+      handle.addEventListener("pointercancel", () => { drag = null; persist(); });
+      handle.addEventListener("dblclick", resetSize);
+      handle.addEventListener("keydown", (event) => {
+        if (event.key === "Home" || event.key === "Enter") { event.preventDefault(); resetSize(); return; }
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const span = Number(wrapper.style.getPropertyValue("--component-span"));
+        const height = layout.getBoundingClientRect().height;
+        fit(span + (event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0), height + (event.key === "ArrowDown" ? 24 : event.key === "ArrowUp" ? -24 : 0));
+        persist();
+      });
+      component.append(handle);
+    }
+  });
+  root.querySelectorAll(":scope > .grid-2, :scope > .secondary-kpis, .dashboard-group-body > .grid-2").forEach((grid) => grid.replaceWith(...grid.childNodes));
+}
+
 function renderPage() {
   const scoped = filtered();
-  const renderers = { overview: overviewView, tidp: tidpView, tickets: ticketsView, families: familiesView, dependencies: dependenciesView, team: teamView, quality: qualityView };
+  const renderers = { overview: overviewView, tidp: tidpView, tickets: ticketsView, families: familiesView, dependencies: dependenciesView, team: familyAnalysisView, quality: qualityView };
   document.querySelector("#page-content").innerHTML = renderers[state.page](scoped);
+  applyComponentLayout();
   document.querySelectorAll("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === state.page));
+}
+
+function openPieDetails(id, filter, value, trigger) {
+  pieDetailTrigger = trigger || pieDetailTrigger;
+  const scoped = filtered();
+  const meta = pieDetails.get(id);
+  if (!meta) return;
+  let rows;
+  let columns;
+  if (id === "family-outcomes") {
+    rows = uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => familyOutcome(r) === value);
+    columns = ["id", "name", "category", "uploader", "reworkOutcome", "ticketStatus", "end"];
+  } else if (id === "family-upload") {
+    rows = [...new Map(scoped.deliverables.filter((r) => r.familyKey && r.workType === "Revise the RFA library").map((r) => [r.familyKey, r])).values()].filter((r) => Boolean(r.familyId) === (value === "Uploaded"));
+    columns = ["id", "title", "system", "owner", "workType"];
+  } else {
+    rows = scoped.tickets.filter((r) => (filter === "active" ? hourClass(r) : r[filter]) === value && (!id.startsWith("positive-") || hourClass(r) === "Positive"));
+    columns = ["id", "summary", "active", "reporter", "handler", "status", "actualHours", "end"];
+  }
+  pieDetailSelection = { id, filter, value, rows, columns, page: 1, sort: "", descending: true, searches: {} };
+  renderPieDetails();
+}
+
+function renderPieDetails() {
+  const s = pieDetailSelection;
+  const meta = pieDetails.get(s.id);
+  const rows = s.rows.filter((r) => s.columns.every((key) => String(r[key] ?? "").toLowerCase().includes((s.searches[key] || "").toLowerCase())));
+  if (s.sort) rows.sort((a, b) => {
+    const av = a[s.sort], bv = b[s.sort];
+    if (av === null || av === undefined || av === "") return bv === null || bv === undefined || bv === "" ? 0 : 1;
+    if (bv === null || bv === undefined || bv === "") return -1;
+    return (typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv), undefined, { numeric: true })) * (s.descending ? -1 : 1);
+  });
+  const rowMarkup = (r) => `<tr>${s.columns.map((key) => `<td>${escapeHtml(r[key] ?? "—")}</td>`).join("")}</tr>`;
+  const labels = { id: "ID", title: "Family / deliverable", summary: "Ticket", active: "Classification", reporter: "Reporter", handler: "Handler", status: "Status", actualHours: "Hours", created: "Created date", end: "End date", system: "System", owner: "Owner", workType: "Work type", plannedStartWeek: "First planned CW", plannedFinishWeek: "Last planned CW" };
+  Object.assign(labels, { name: "Family", category: "Category", uploader: "Uploader", reworkOutcome: "Outcome", ticketStatus: "Ticket status" });
+  document.querySelector("#drawer-root").innerHTML = `<div class="drawer-backdrop" data-close-drawer></div><aside class="drawer chart-detail-drawer" role="dialog" aria-modal="true" aria-labelledby="pie-detail-title"><button class="drawer-close" data-close-drawer aria-label="Close">×</button><h2 id="pie-detail-title">${escapeHtml(meta.title)} — ${escapeHtml(s.value)}</h2><div class="table-wrap" tabindex="0" aria-label="Scrollable detail records"><table><thead><tr>${s.columns.map((key) => `<th aria-sort="${s.sort === key ? s.descending ? "descending" : "ascending" : "none"}"><button data-pie-sort="${key}">${labels[key]} ${s.sort === key ? s.descending ? "↓" : "↑" : "↕"}</button><input data-pie-search="${key}" aria-label="Search ${labels[key]} in details" value="${escapeHtml(s.searches[key] || "")}" /></th>`).join("")}</tr></thead><tbody>${rows.slice(0, 100).map(rowMarkup).join("") || `<tr><td colspan="${s.columns.length}" class="empty">No matching records.</td></tr>`}</tbody></table></div><div class="detail-count" role="status">${fmt(Math.min(100, rows.length))} / ${fmt(rows.length)} records</div></aside>`;
+  if (meta.source) document.querySelector("#pie-detail-title").insertAdjacentHTML("afterend", `<details class="chart-source"><summary>Source and definition</summary><p>${escapeHtml(meta.source)} Snapshot: ${fmtDate(data.meta.asOf)}.</p></details>`);
+  const scroller = document.querySelector(".chart-detail-drawer .table-wrap");
+  let shown = Math.min(100, rows.length);
+  scroller.addEventListener("scroll", () => {
+    if (shown >= rows.length || scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 240) return;
+    const end = Math.min(shown + 100, rows.length);
+    scroller.querySelector("tbody").insertAdjacentHTML("beforeend", rows.slice(shown, end).map(rowMarkup).join(""));
+    shown = end;
+    document.querySelector(".chart-detail-drawer .detail-count").textContent = `${fmt(shown)} / ${fmt(rows.length)} records`;
+  }, { passive: true });
+}
+
+function closeDrawer() {
+  document.querySelector("#drawer-root").innerHTML = "";
+  pieDetailTrigger?.focus({ preventScroll: true });
+  pieDetailSelection = null;
 }
 
 function openDrawer(kind, id) {
@@ -436,15 +702,58 @@ function exportCsv(kind) {
 }
 
 function wireEvents() {
+  document.addEventListener("toggle", (event) => {
+    if (event.target.matches?.("[data-collapse]")) state.collapsed[event.target.dataset.collapse] = !event.target.open;
+  }, true);
   document.addEventListener("click", (event) => {
+    const issue = event.target.closest("[data-issue-detail]");
+    if (issue) {
+      const id = issue.dataset.issueDetail;
+      const meta = pieDetails.get(id);
+      pieDetailTrigger = issue;
+      pieDetailSelection = { id, value: `${fmt(meta.rows.length)} records`, rows: meta.rows,
+        columns: meta.columns || ["id", "summary", "workType", "handler", "status", "active", "actualHours", "created", "end"], sort: "", descending: true, searches: {} };
+      renderPieDetails(); document.querySelector(".drawer-close")?.focus(); return;
+    }
+    if (event.target.closest("[data-midp-reset]")) { state.filters = { system: "", owner: "", workType: "", status: "", search: "" }; renderPage(); return; }
+    const midp = event.target.closest("[data-midp-detail]");
+    if (midp) {
+      const id = `midp:${midp.dataset.midpDetail}`;
+      const meta = pieDetails.get(id);
+      const week = Number(midp.dataset.midpWeek);
+      const actual = midp.dataset.midpSeries === "actual";
+      const rows = meta.rows.filter(r => !week || (actual ? r.actualWeek === week : r.weeks.some(w => w.week === week)));
+      pieDetailTrigger = midp;
+      const actualColumns = rows.some(row => row.familyKey) ? ["id", "title", "system", "owner", "end"] : ["id", "title", "system", "reporter", "handler", "status", "end"];
+      pieDetailSelection = { id, value: week ? `CW${week}` : "All planned items", rows, columns: actual ? actualColumns : ["id", "title", "system", "owner", "workType", "plannedStartWeek", "plannedFinishWeek"], sort: "", descending: true, searches: {} };
+      renderPieDetails(); document.querySelector('.drawer-close')?.focus(); return;
+    }
+    const progress = event.target.closest("[data-progress-detail]");
+    if (progress) {
+      const meta = pieDetails.get("family-progress");
+      const week = Number(progress.dataset.progressWeek);
+      const series = progress.dataset.progressDetail;
+      const cutoff = meta.weekEnd(week) < data.meta.asOf ? meta.weekEnd(week) : data.meta.asOf;
+      const rows = meta.rows.filter((r) => series === "Plan" ? r.plannedStartWeek && r.plannedStartWeek <= week : r.end && r.end <= cutoff);
+      if (!rows.length) return;
+      pieDetailTrigger = progress;
+      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns: ["id", "title", "system", "owner", "plannedStartWeek", "end"], page: 1, sort: "", descending: true, searches: {} };
+      renderPieDetails(); document.querySelector(".drawer-close")?.focus(); return;
+    }
+    const slice = event.target.closest("[data-pie-detail]");
+    if (slice) { openPieDetails(slice.dataset.pieDetail, slice.dataset.sliceFilter, slice.dataset.sliceValue, slice); document.querySelector(".drawer-close")?.focus(); return; }
+    const sort = event.target.closest("[data-pie-sort]");
+    if (sort) { const s = pieDetailSelection; s.descending = s.sort === sort.dataset.pieSort ? !s.descending : true; s.sort = sort.dataset.pieSort; renderPieDetails(); document.querySelector(`[data-pie-sort="${s.sort}"]`)?.focus(); return; }
+    const piePage = event.target.closest("[data-pie-page]");
+    if (piePage) { pieDetailSelection.page += Number(piePage.dataset.piePage); renderPieDetails(); document.querySelector(".drawer-close")?.focus(); return; }
     const nav = event.target.closest("[data-nav]");
     if (nav) { state.page = nav.dataset.nav; state.tablePage = 1; renderPage(); return; }
     if (event.target.closest("#reset-filters")) { state.filters = { system: "", owner: "", workType: "", status: "", search: "" }; document.querySelector("#app").innerHTML = appShell(); wireTopbar(); renderPage(); return; }
     const setFilter = event.target.closest("[data-set-filter]");
-    if (setFilter) { state.filters[setFilter.dataset.setFilter] = setFilter.dataset.filterValue; document.querySelector(`[data-filter="${setFilter.dataset.setFilter}"]`).value = setFilter.dataset.filterValue; state.tablePage = 1; renderPage(); return; }
+    if (setFilter) { const key = setFilter.dataset.setFilter; state.filters[key] = state.filters[key] === setFilter.dataset.filterValue ? "" : setFilter.dataset.filterValue; state.tablePage = 1; renderPage(); return; }
     const open = event.target.closest("[data-open-kind]");
     if (open) { openDrawer(open.dataset.openKind, open.dataset.openId); return; }
-    if (event.target.closest("[data-close-drawer]")) document.querySelector("#drawer-root").innerHTML = "";
+    if (event.target.closest("[data-close-drawer]")) closeDrawer();
     const step = event.target.closest("[data-page-step]");
     if (step) { state.tablePage += Number(step.dataset.pageStep); renderPage(); }
     const action = event.target.closest("[data-action]");
@@ -452,7 +761,48 @@ function wireEvents() {
     const exportButton = event.target.closest("[data-export-kind]");
     if (exportButton) exportCsv(exportButton.dataset.exportKind);
   });
+  document.addEventListener("keydown", (event) => {
+    const slice = event.target.closest("[data-pie-detail], [data-progress-detail]");
+    if (slice && ["Enter", " "].includes(event.key)) { event.preventDefault(); slice.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+    const drawer = document.querySelector(".drawer");
+    if (!drawer) return;
+    if (event.key === "Escape") closeDrawer();
+    if (event.key === "Tab") {
+      const nodes = [...drawer.querySelectorAll('button:not(:disabled), input, summary, [tabindex="0"]')];
+      const first = nodes[0], last = nodes.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
+  });
+  let detailSearchTimer;
+  document.addEventListener("input", (event) => {
+    if (!event.target.matches("[data-pie-search]") || !pieDetailSelection) return;
+    const input = event.target, key = input.dataset.pieSearch, selection = pieDetailSelection;
+    selection.searches[key] = input.value;
+    clearTimeout(detailSearchTimer);
+    detailSearchTimer = setTimeout(() => {
+      if (pieDetailSelection !== selection) return;
+      const focused = document.activeElement === input, caret = input.selectionStart;
+      renderPieDetails();
+      if (focused) {
+        const next = document.querySelector(`[data-pie-search="${key}"]`);
+        next?.focus(); next?.setSelectionRange(caret, caret);
+      }
+    }, 250);
+  });
   document.addEventListener("change", (event) => {
+    if (event.target.matches("[data-issue-filter]")) {
+      state.filters[event.target.dataset.issueFilter] = event.target.value;
+      state.tablePage = 1; renderPage(); return;
+    }
+    if (event.target.matches("[data-pie-search]")) { const key = event.target.dataset.pieSearch; pieDetailSelection.searches[key] = event.target.value; pieDetailSelection.page = 1; renderPieDetails(); document.querySelector(`[data-pie-search="${key}"]`)?.focus(); return; }
+    if (event.target.matches("#family-axis-step")) {
+      const value = Number(event.target.value);
+      if (!Number.isInteger(value) || value < 10 || value > 5000) { event.target.reportValidity(); return; }
+      state.familyAxisStep = value;
+      renderPage();
+      document.querySelector("#family-axis-step")?.focus({ preventScroll: true });
+    }
     if (event.target.matches("#team-metric")) { state.teamMetric = event.target.value; renderPage(); }
   });
 }

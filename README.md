@@ -2,6 +2,8 @@
 
 An integrated BIM / Digital Delivery project-control dashboard combining MIDP/TIDP planning, Annotation Ticket operations and Revit Family Upload readiness.
 
+The data-governance, terminology and delivery rules documented in this repository are specific to this PMP Dashboard project. They must not be assumed to apply to other repositories or projects.
+
 ## Purpose
 
 The application helps Directors, Project Managers, Digital Leads and BIM Coordinators move from project health to evidence and action. It is not a generic BI gallery: every risk rule is explicit, every relationship is labelled and every high-level record can be traced to its source chain.
@@ -25,6 +27,10 @@ Place controlled source files in `RawSource/`:
 - `Family_Upload_vs_Annotation_Tickets_Checked.xlsx`
 
 The committed `public/data/dashboard-data.json` is generated from these snapshots. Rebuild it whenever the source files change.
+
+These three workbooks are the authoritative sources for the dashboard. Every other data file in the repository is derived from them. If a derived file conflicts with one of these workbooks, resolve the conflict in favor of the authoritative workbook and regenerate the derived output.
+
+For Family data, include only records belonging to `DCMvn_Annotation Project`. Family records associated with any other project must be excluded before generating derived data, KPI totals or dashboard views.
 
 ## Architecture
 
@@ -58,6 +64,8 @@ npm run dev
 
 Open the local URL printed by Vite. The raw `index.html` file should not be opened directly because the application loads modules and data through HTTP.
 
+After dashboard changes are complete, leave the local dashboard server running for review and report its URL. Do not push, publish or deploy changes unless explicitly requested.
+
 ## Validation and production build
 
 ```bash
@@ -86,6 +94,50 @@ The current repository is private and its GitHub plan did not support Pages at t
 - [KPI dictionary](docs/kpi-definition.md)
 - [Risk rules](docs/risk-rules.md)
 - [Design system](docs/design-system.md)
+
+## Abbreviations
+
+| Abbreviation | Meaning |
+| --- | --- |
+| DC | Digital Coordinator |
+| DL | Digital Lead |
+| DIG | Digital Team |
+| MM | MEP Modeler |
+| ML | MEP Lead |
+| MEP | MEP Team |
+| TRM | Transmittal |
+| AUD | Audit |
+| REV | Revise |
+| CFM | Confirm |
+
+## Project personnel
+
+| Vi Trí | Name | Username |
+| --- | --- | --- |
+| Digital Lead | Huy Dam | `hu.dam` |
+| Digital Coordinator | Long Dang | `lk.dang` |
+| Digital Coordinator | Nhan Huynh | `nd.huynh` |
+| Digital Coordinator | Khoa Doan | `kd.doan` |
+| Digital Coordinator | Quy Ha | `qn.ha` |
+| Digital Coordinator | Hung Nguyen | `ht.nguyen` |
+| Digital Coordinator | Quan Nguyen | `qn.nguyen` |
+| Digital Coordinator | Danh Nguyen | `dahn.nguyen` |
+| COO | Frankie Imbrogno | `f.imbrogno` |
+| MEP Lead | Lam Truong | `l.truong` |
+| MEP Lead | Thuong Huynh | `tv.huynh` |
+| MEP Lead | Nhut Le | `n.le` |
+| MEP Lead | Sang Duong | `s.duong` |
+| MEP Lead | Hanh Pham | `h.pham` |
+
+## System ownership
+
+| System | Person in charge | Username |
+| --- | --- | --- |
+| ELT/MSR | Hanh Pham | `h.pham` |
+| RLT | Lam Truong | `l.truong` |
+| SAN | Thuong Huynh | `tv.huynh` |
+| SPR MED | Sang Duong | `s.duong` |
+| HKG | Nhut Le | `n.le` |
 
 ## Security
 

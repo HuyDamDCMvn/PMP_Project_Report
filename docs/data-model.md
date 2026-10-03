@@ -34,10 +34,14 @@ The three files in `RawSource` have the same SHA-256 hashes as the files supplie
 - Grain: one uploaded family.
 - Key: normalized `Family Name` for analysis; original text is always retained.
 - `Ticket_IDs` provides direct family-to-ticket relationships.
-- Missing fields: required date, upload date, approval status, revision due date and explicit TIDP ID.
+- `Rework_Outcome` is retained as `reworkOutcome`: One_pass and Returned are source classifications; blank values remain unclassified. Ticket count and Active are not substitutes for this field.
+- Dates: retain source Start Date and End Date. The project user confirms End Date as the actual upload milestone for the cumulative upload chart; each normalized family is counted once at its earliest recorded End Date.
+- Missing fields: required date, separate upload timestamp, approval status, revision due date and explicit TIDP ID.
 - The `Unmatched` sheet contains 59 family names that also appear in the main sheet; this is exposed as a source-sheet contradiction rather than silently choosing a status.
 
 ## Relationships
+
+MIDP non-RFA Actual additionally derives system-lot ticket aggregates from unambiguous explicit system tokens in Matrix Ticket Summary plus exact Work Type. This does not establish a one-to-one TIDP-to-Ticket link. Missing/ambiguous system summaries remain unassigned and reporter is not a substitute.
 
 | Relationship | Classification | Method | Limitation |
 | --- | --- | --- | --- |
