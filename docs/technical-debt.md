@@ -5,11 +5,19 @@ Tài liệu ghi nhận các vấn đề đã biết của PMP Dashboard để x�
 ## TD001 Chưa thống nhất phạm vi Uploaded Families giữa các trang
 
 - Ngày ghi nhận: 04/10/2026.
-- Trạng thái: Ghi nhận — chưa xử lý, chờ yêu cầu triển khai.
+- Trạng thái: Đã áp dụng giải pháp tạm theo quyết định người dùng 04/10/2026; chưa đóng phần xác minh tương đương nghiệp vụ.
 - Phạm vi: Executive Overview, Issues, Productivity và bộ lọc liên quan.
 - Mốc dữ liệu đã điều tra: 30/09/2026, không có bộ lọc.
 
-### Hiện trạng và ảnh hưởng
+### Cập nhật triển khai tạm 04/10/2026
+
+Người dùng chấp thuận coi toàn bộ ánh xạ trong `Annotation_RFA_equivalence_Checked.xlsx` là tương đương với TIDP, kể cả proposed và accepted temporary. Áp dụng nguyên bản (Git blob `8c9bc55511f3f5f107a5923739d65361aec7fa15`), không tự sửa đích Ticket 72176 theo đề xuất rà soát. Ba workbook chính không thay đổi. Trạng thái/độ tin cậy nguồn được giữ riêng với quyết định áp dụng tạm.
+
+Baseline sau tái tạo: 2.295 tên TIDP = 2.001 upload khớp (87,2%) + 294 chưa có liên kết upload. Có thêm 68 liên kết tương đương; không tạo thêm Family hay ticket. MIDP Actual, đường tích lũy và forecast dùng cùng familyId với donut và bộ lọc. Issues/Productivity vẫn đếm 2.001 uploaded, 1.500 One pass và 501 Returned; Ticket_IDs và giờ thực giữ nguyên.
+
+Nợ còn lại: xác minh nghiệp vụ các alias, nhất là 12 trường hợp cần xác nhận và ánh xạ Ticket 72176 đã nêu trong rà soát. Tổng upload và coverage TIDP vẫn là hai định nghĩa khác nhau; bằng nhau ở snapshot này không bảo đảm sẽ bằng nhau khi nguồn mở rộng. Không xem chấp thuận tạm là xác minh mô hình, hoàn tất ticket hay approval Family. Các số và kế hoạch dưới đây là hồ sơ điều tra trước khi áp dụng ngoại lệ tạm.
+
+### Hiện trạng trước giải pháp tạm
 
 Overview hiển thị 1.933 Family uploaded, trong khi Issues và Productivity hiển thị 2.001. Hai số dùng phạm vi khác nhau nhưng dễ được hiểu là cùng một chỉ tiêu. Điều này gây nhầm lẫn khi so sánh số lượng, tỷ lệ hoàn thành và kết quả lọc giữa các trang.
 
@@ -63,4 +71,4 @@ Không thay trực tiếp 1.933 bằng 2.001 trong donut kế hoạch có mẫu 
 - `src/app.js`: `overviewView`, `filtered`, `familyAnalysisView` và chi tiết donut.
 - `src/family-outcomes.js`: `uploadedFamilyRows`, `uploadedFamilyCohort`, `familyProductivity`.
 
-Chỉ ghi nhận nợ kỹ thuật theo yêu cầu; chưa triển khai kế hoạch sửa và chưa thay đổi nguồn dữ liệu.
+Hồ sơ ban đầu chỉ ghi nhận nợ kỹ thuật. Giải pháp tạm đã được triển khai theo cập nhật 04/10/2026 ở trên; ba nguồn dữ liệu chính không thay đổi.

@@ -20,6 +20,8 @@ These are project-specific rules for the `PMP Dashboard` repository only.
 - Treat every other data file as derived data that inherits its results from the three authoritative files above.
 - If any derived file conflicts with an authoritative file, use the authoritative file and regenerate or update the derived output accordingly.
 - Do not use a derived file to overwrite or reinterpret conflicting values in an authoritative file.
+- User-approved temporary exception (04/10/2026): use all mappings in `RawSource/Annotation_RFA_equivalence_Checked.xlsx`, sheet `Equivalence`, as supplied, including proposed/temporary rows. This is a supplemental TIDP-to-Family equivalence policy, not a replacement for the three authoritative sources. Preserve original names, dates, Ticket_IDs, outcomes and mapping decisions. Pin the approved workbook version; re-review changed mappings before renewing approval. Do not automatically apply suggested corrections from the audit.
+- User-approved supplemental exception (04/10/2026): read ticket-system API time history to calculate the Weekly Annotation Project hours chart for Matrix Positive/Re-Assessment tickets, CW01–CW40. Net added/deleted time by the work date, floor ticket-week nets to 0.25 h, and disclose reconciliation gaps. This supplement must not overwrite Matrix total hours/classifications or other authoritative values. Keep credentials server-side and access read-only.
 - For Family data, include only records belonging to the project `DCMvn_Annotation Project`.
 - Exclude Family records from every other project from generated datasets, calculations, KPIs, filters, charts, tables and totals.
 - Apply this project filter while processing the authoritative Family workbook, before producing any derived Family output.
@@ -72,7 +74,7 @@ Digital Coordinator | Nhan Huynh | nd.huynh
 Digital Coordinator | Khoa Doan | kd.doan
 Digital Coordinator | Quy Ha | qn.ha
 Digital Coordinator | Hung Nguyen | ht.nguyen
-Digital Coordinator | Quan Nguyen | qn.nguyen
+Digital Coordinator | Quan Nguyen | qd.nguyen
 Digital Coordinator | Danh Nguyen | dahn.nguyen
 COO | Frankie Imbrogno | f.imbrogno
 MEP Lead | Lam Truong | l.truong
@@ -80,6 +82,53 @@ MEP Lead | Thuong Huynh | tv.huynh
 MEP Lead | Nhut Le | n.le
 MEP Lead | Sang Duong | s.duong
 MEP Lead | Hanh Pham | h.pham
+MEP Modeler | Binh Tran | b.tran
+Other | Other | bn.hoai
+Other | Other | bnh.ext
+MEP Modeler | Cong Le | c.le
+MEP Modeler | Duc Le | d.le
+MEP Modeler | Dat Nguyen | d.nguyen
+MEP Modeler | Danh Phan | d.phan
+MEP Modeler | Dat Nguyen II | da.nguyen
+MEP Modeler | Dang Nguyen | dhn.nguyen
+Other | Other | dq.nong
+MEP Modeler | Du Nguyen | dv.nguyen
+MEP Modeler | Duong Quach | dx.quach
+MEP Modeler | Huong Huynh | h.huynh
+MEP Modeler | Huy Le | h.le
+MEP Modeler | Ha Phan | ha.phan
+MEP Modeler | Hoa Le | hoa.le
+MEP Modeler | Ha Pham | ht.pham
+MEP Modeler | Huy Tran | ht.tran
+MEP Modeler | Khoa Mai | k.mai
+MEP Modeler | Luc Nguyen | l.nguyen
+MEP Modeler | Lam Pham | l.pham
+MEP Modeler | Long Su | l.su
+MEP Modeler | Nguyen Bui | n.bui
+MEP Modeler | Nam Chau | n.chau
+MEP Modeler | Nhat Dinh | n.dinh
+MEP Modeler | Nhu Nguyen | n.nguyen
+MEP Modeler | Ngoan Vo | n.vo
+MEP Modeler | Phuc Tran | pv.tran
+MEP Modeler | Thi Bui | t.bui
+MEP Modeler | Toan Do | t.do
+MEP Modeler | Thai Doan | t.doan
+MEP Modeler | Truong Huynh | t.huynh
+MEP Modeler | Trang Le | t.le
+MEP Modeler | Trieu Luu | t.luu
+MEP Modeler | Truong Tran | t.tran
+MEP Modeler | Tam Trinh | t.trinh
+MEP Modeler | Than Le | th.le
+MEP Modeler | Tham Nguyen | th.nguyen
+MEP Modeler | Thy Pham | tk.pham
+MEP Modeler | Tan Doan | tm.doan
+MEP Modeler | Thanh Nguyen | tn.nguyen
+MEP Modeler | Trong Bui | tt.bui
+MEP Modeler | Thoa Bui | ttc.bui
+MEP Modeler | Tu Le | tu.le
+MEP Modeler | Tuan Nguyen | tu.nguyen
+MEP Modeler | Uyen Nguyen | u.nguyen
+MEP Modeler | Yen Nguyen | y.nguyen
 ```
 
 ## System ownership

@@ -1,3 +1,20 @@
+import { linkedUploadDates } from "./family-links.js";
+
+export function midpTableExport(groups, weeks, actualByGroup, reportingWeek) {
+  const columns = [{ key: "lot", label: "Team / lot" }, { key: "owner", label: "Owner" },
+    { key: "items", label: "Items" }, { key: "series", label: "Series" },
+    ...weeks.map(week => ({ key: `cw${week}`, label: `CW${String(week).padStart(2, "0")}` }))];
+  const rows = groups.flatMap(group => {
+    const base = { lot: `${group.team} / ${group.batch}`, owner: [...new Set(group.records.map(r => r.owner))].sort().join("; "), items: group.records.length };
+    const actual = actualByGroup.get(group.key) || [];
+    return ["Actual", "Plan"].map(series => ({ ...base, series, ...Object.fromEntries(weeks.map(week => {
+      const count = series === "Plan" ? group.weeks.get(week)?.ids.size : week <= reportingWeek ? actual.filter(row => row.actualWeek === week).length : 0;
+      return [`cw${week}`, count || ""];
+    })) }));
+  });
+  return { columns, rows };
+}
+
 // Input contract is source-neutral: future TIDP adapters supply the same fields.
 // Explicit team/batch IDs take precedence; System is only the current fallback lot.
 export function aggregateMidp(records) {
@@ -29,13 +46,7 @@ export function midpWeeklyActual(group, families, asOf, tickets = []) {
       ticketSystem(ticket.summary) === group.batch && validEnd(ticket.end, asOf)
     ).map(ticket => ({ ...ticket, title: ticket.summary, system: group.batch, actualWeek: isoWeek(ticket.end).week }));
   }
-  const dates = new Map();
-  for (const family of families) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(family.end || "")) continue;
-    const parsed = new Date(`${family.end}T00:00:00Z`);
-    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== family.end) continue;
-    if (!dates.has(family.key) || family.end < dates.get(family.key)) dates.set(family.key, family.end);
-  }
+  const dates = linkedUploadDates(group.records, families, asOf);
   const rows = new Map();
   for (const record of group.records) {
     const end = dates.get(record.familyKey);

@@ -12,3 +12,5 @@
 | RISK-08 | Family mapping references a ticket absent from the ticket snapshot | Grey | Family ticket ID comparison | Reconcile snapshots or source systems |
 
 Rules are evaluated after filters. A user is never labelled a poor performer solely because of ticket count.
+
+04/10/2026: RISK-02 and RISK-03 use the applied link policy (exact names plus user-approved temporary equivalence), not exact names alone. A temporary link does not prove model identity, approval or ticket completion. Source statuses remain unchanged and unresolved tickets remain unresolved.

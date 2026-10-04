@@ -5,3 +5,5 @@ dist/
 env.local.md
 .source-profile.json
 *.log
+.time-history-cache/
+__pycache__/

@@ -1,5 +1,21 @@
 # Data analysis and relationship model
 
+System × error heatmap counts the same Returned Family X flags as the donut. System is derived only from approved Family-to-TIDP links: a single distinct System is used; none means Unknown system; more than one means Multiple systems. These buckets count each Family/error once, preserving the donut total. errorSystem filtering propagates via direct Family ticket IDs and approved linked TIDP rows; it is separate from the existing planning System filter. Computation and rendering live in rework-heatmap.js; authoritative source files are unchanged.
+
+Family records retain reworkErrors from the nine X-marked error columns in authoritative Family_vs_Tickets. Only project-filtered uploaded Returned Families enter the error donut; each marked column counts once per Family. Source flags do not identify individual erroneous tickets in multi-ticket Families. The disclosure therefore reports unique linked tickets separately from error-flag totals without claiming a per-ticket classification.
+
+The user additionally authorizes actual-recorder API attribution for the Family-effort chart (04/10/2026). Rebuild with `python scripts/build_family_role_hours.py`. It reads only tickets directly linked to project-filtered uploaded Families, validates the API project, applies the snapshot calendar-date cutoff, and exports sanitized ticket/person totals to `family-role-hours.json`. Roles are parsed from the checked-in AGENTS.md personnel mapping. The ignored `.time-history-cache/person-hours/` stores sanitized author usernames and time events for resumable reads. Credentials, email addresses and raw notes are never exported. A deletion reverses an earlier matching work-date/hour addition from the same author, or from an unambiguous sole original author. Ambiguous cross-author deletion is an evidence gap, not assigned to the person deleting it. Time-log author is the attribution available in the API; on-behalf-of entry cannot be independently established. Clear only that cache when requesting a fresh attribution refresh.
+
+## User-approved weekly time-history supplement (04/10/2026)
+
+Role attribution matches deletion display precision within 0.005 h of an earlier same-work-date addition, preferring the same author and otherwise requiring a sole unambiguous author. It applies the exact signed deletion value to that author, preserving residuals before flooring, rather than dropping the original addition entirely. The build currently exports complete attribution for all 2,002 linked tickets; future gaps remain explicit.
+
+The user authorizes read-only ticket API history for the weekly Positive-hours chart only. Matrix remains authoritative for Ticket IDs, classifications, names and total-hour KPIs. `scripts/build_weekly_hours.py` reads only those Positive/Re-Assessment ticket IDs, validates the API project, and exports sanitized time events; credentials and raw ticket notes never enter public data. The ignored `.time-history-cache/` retains only work dates, signed hours and edit timestamps for resumable reads. Remove this cache before a fresh API refresh. Rebuild with `python scripts/build_weekly_hours.py`; output is `public/data/weekly-hours.json`.
+
+`Time allocated` adds hours; `Time allocated Deleted` subtracts hours. Parse the work date from old_value, supporting d.m.yyyy / yyyy-mm-dd and comma decimals. Preserve repeated legitimate events rather than deduplicating date/hour pairs. Exclude work dates and history edit dates after the snapshot date. API edits are filtered by calendar date; this is not an exact 16:00 point-in-time reconstruction. Net per ticket/ISO week, floor to 0.25 h, then aggregate CW01–CW40/2026. Weekly rounding can differ from flooring a lifetime ticket total; never force-match the chart to workbook totals. Negative nets are retained for audit, not clamped to zero. API failures and unknown time formats remain explicit incomplete evidence, not measured zero.
+
+The exported per-ticket audit compares net snapshot history with original Matrix hours, including out-of-period hours. Differences are diagnostic only and do not overwrite authoritative values. The chart is project-wide, unlike the uploaded-Family cohort widgets. Shared filters act through scoped Matrix ticket IDs; `spentWeek` joins sanitized time entries to tickets and then direct Family/TIDP links.
+
 ## Source inventory
 
 | Dataset | Authoritative sheet | Rows | Role in the model |
@@ -40,6 +56,8 @@ The three files in `RawSource` have the same SHA-256 hashes as the files supplie
 - The `Unmatched` sheet contains 59 family names that also appear in the main sheet; this is exposed as a source-sheet contradiction rather than silently choosing a status.
 
 ## Relationships
+
+04/10/2026 temporary policy supersedes the exact-only coverage below: all mappings in `Annotation_RFA_equivalence_Checked.xlsx / Equivalence` are provisionally accepted by the user, without editing the three authoritative workbooks. Family retains `key`, `name`, dates and direct tickets; `tidpEquivalence` retains both endpoints, source row/decision/method/confidence and applied temporary decision. TIDP retains its original `familyKey` and receives `familyId`, `familyMatchMethod` and `equivalenceRow`. The mapping adds 68 distinct links, for 2.001 matched unique planned names out of 2.295; the 294 remaining names are unmatched, not proven unuploaded. Counts of work-item rows must remain distinct from unique names.
 
 MIDP non-RFA Actual additionally derives system-lot ticket aggregates from unambiguous explicit system tokens in Matrix Ticket Summary plus exact Work Type. This does not establish a one-to-one TIDP-to-Ticket link. Missing/ambiguous system summaries remain unassigned and reporter is not a substitute.
 

@@ -1,4 +1,5 @@
 import { validSnapshotDate, isoWeekKey, issueMetrics } from "./issues.js";
+import { forecastCatchUp } from "./domain.js";
 
 export function familyOutcome(family) {
   if (family.reworkOutcome === "One_pass") return "One pass";
@@ -24,11 +25,37 @@ export function uploadedFamilyCohort(families, tickets, asOf) {
   return { families: uploaded, tickets: linked };
 }
 
-export function familyProductivity(families, tickets, asOf) {
+export function familyProductivity(families, tickets, asOf, { startWeek, target } = {}) {
   const cohort = uploadedFamilyCohort(families, tickets, asOf);
-  const issues = issueMetrics(cohort.tickets, asOf);
+  const weekCount = startWeek == null ? 8 : Math.max(1, Number(isoWeekKey(asOf).slice(-2)) - startWeek + 1);
+  const issues = issueMetrics(cohort.tickets, asOf, weekCount);
   const weeks = issues.weeks.map(week => ({ ...week, uploaded: cohort.families.filter(family => isoWeekKey(family.end) === week.key) }));
   const onePass = cohort.families.filter(family => familyOutcome(family) === "One pass");
+  const reportingWeek = Number(isoWeekKey(asOf).slice(-2));
+  const partial = new Date(`${asOf}T00:00:00Z`).getUTCDay() !== 0;
+  const completeWeeks = partial ? weeks.slice(0, -1) : weeks;
+  const weeklyRate = completeWeeks.slice(-4).reduce((sum, week) => sum + week.uploaded.length, 0) / 4;
+  const projection = Number.isFinite(target) ? forecastCatchUp(cohort.families.length, target, weeklyRate, reportingWeek) : { points: [] };
+  const forecastWeeks = projection.points.filter(point => point.week > reportingWeek && point.week <= 43).map((point, i) => ({
+    week: point.week, value: point.value - (i ? projection.points.find(p => p.week === point.week - 1).value : cohort.families.length),
+  }));
+  const firstUpload = cohort.families.map(family => family.end).sort()[0] || null;
+  const calendarDays = firstUpload ? Math.floor((Date.parse(asOf) - Date.parse(firstUpload)) / 86400000) + 1 : 0;
   return { ...cohort, issues, weeks, onePass,
+    firstUpload, calendarDays, weeklyRate, forecastWeeks,
+    uploadsPerDay: calendarDays ? cohort.families.length / calendarDays : null,
+    hoursPerFamily: cohort.families.length && issues.hoursRows.length ? issues.hours / cohort.families.length : null,
     onePassRate: cohort.families.length ? onePass.length / cohort.families.length : null };
+}
+
+// Preserve the Overview population; ticket numbers are evidence, not additional rows.
+export function tidpUploadDetails(deliverables, familyById, value) {
+  const uploaded = value === "Uploaded";
+  const rows = [...new Map(deliverables.filter(r => r.familyKey && r.workType === "Revise the RFA library").map(r => [r.familyKey, r])).values()]
+    .filter(r => Boolean(r.familyId) === uploaded);
+  const columns = ["id", "title", "system", "owner", "workType"];
+  if (!uploaded) return { rows, columns };
+  columns.splice(4, 0, "ticketNumber");
+  return { columns, rows: rows.map(row => ({ ...row, ticketNumber: [...new Set(familyById.get(row.familyId)?.ticketIds || [])]
+    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })).join(", ") || null })) };
 }

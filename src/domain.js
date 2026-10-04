@@ -100,7 +100,7 @@ export function managementAttention(data, deliverables, tickets, families, conte
       items.push({
         severity: "critical",
         rule: "RISK-02",
-        issue: "Near-term RFA work has no exact uploaded-family match",
+        issue: "Near-term RFA work has no uploaded-family match under the applied mapping policy",
         impact: `${deliverable.title} is planned through CW${deliverable.plannedFinishWeek}.`,
         owner: deliverable.owner || "Unassigned",
         due: `CW${deliverable.plannedFinishWeek}`,

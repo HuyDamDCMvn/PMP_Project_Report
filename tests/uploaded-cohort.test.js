@@ -42,7 +42,9 @@ test("two analysis renderers preserve issue and productivity evidence inside ind
     heading: () => "", escapeHtml: String, fmt: String, fmtDate: String, register: (id, meta) => evidence.set(id, meta) };
   const issues = renderIssues(props);
   assert.ok(issues.includes("FAMILY_DONUT"));
-  assert.ok(issues.includes("Open issues"));
+  assert.ok(issues.includes("Weekly linked issues"));
+  assert.ok(!issues.includes("Open issues by handler"));
+  assert.ok(!issues.includes("Issue pulse"));
   assert.ok(!issues.includes("Linked recorded effort"));
   const productivity = renderProductivity(props);
   assert.ok(productivity.includes("Weekly Family uploads"));

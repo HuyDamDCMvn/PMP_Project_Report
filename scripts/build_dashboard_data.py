@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import re
 from decimal import Decimal, ROUND_FLOOR
@@ -17,6 +18,39 @@ RAW = ROOT / "RawSource"
 OUTPUT = ROOT / "public" / "data" / "dashboard-data.json"
 AS_OF = date(2026, 9, 30)
 CURRENT_WEEK = 40
+EQUIVALENCE_GIT_BLOB = "8c9bc55511f3f5f107a5923739d65361aec7fa15"
+
+
+def equivalence_links(frame, family_by_key, tidp_keys):
+    """Explicit user-approved temporary aliases; never infer from confidence/status."""
+    links = {}
+    uploaded_keys = set()
+    for index, row in frame.iterrows():
+        source = normalize_family_name(row.get("Uploaded family"))
+        target = normalize_family_name(row.get("Equivalent TIDP family"))
+        if not source or source not in family_by_key or not target or target not in tidp_keys:
+            raise ValueError(f"Invalid equivalence endpoint at Excel row {index + 2}")
+        if text(row.get("In TIDP (Y/N)")) != "Y":
+            raise ValueError(f"Equivalence not marked in TIDP at Excel row {index + 2}")
+        if source in uploaded_keys or target in links:
+            raise ValueError(f"Ambiguous equivalence at Excel row {index + 2}")
+        if target in family_by_key and target != source:
+            raise ValueError(f"Equivalence conflicts with an existing exact upload at row {index + 2}")
+        uploaded_keys.add(source)
+        links[target] = {
+            "familyId": family_by_key[source]["id"],
+            "uploadedKey": source,
+            "tidpKey": target,
+            "uploadedName": text(row.get("Uploaded family")),
+            "tidpName": text(row.get("Equivalent TIDP family")),
+            "sourceRow": int(index) + 2,
+            "sourceDecision": text(row.get("Decision")),
+            "sourceMethod": text(row.get("Method")),
+            "sourceConfidence": clean(row.get("Confidence %")),
+            "ticketIds": parse_ticket_ids(row.get("Ticket ID")),
+            "appliedDecision": "User-approved temporary equivalence",
+        }
+    return links
 
 
 def clean(value: Any) -> Any:
@@ -65,6 +99,12 @@ def main() -> None:
     ticket_path = RAW / "Annotation_Ticket_User_Matrix_Checked.xlsx"
     family_path = RAW / "Family_Upload_vs_Annotation_Tickets_Checked.xlsx"
     tidp_path = RAW / "DCMvn_TIDP_Combined_20260930.xlsx"
+    equivalence_path = RAW / "Annotation_RFA_equivalence_Checked.xlsx"
+    equivalence_bytes = equivalence_path.read_bytes()
+    equivalence_hash = hashlib.sha1(b"blob " + str(len(equivalence_bytes)).encode() + b"\0" + equivalence_bytes).hexdigest()
+    if equivalence_hash != EQUIVALENCE_GIT_BLOB:
+        raise ValueError("Equivalence workbook changed: review and renew temporary approval before rebuilding")
+    equivalence_frame = pd.read_excel(equivalence_path, sheet_name="Equivalence")
 
     ticket_frame = pd.read_excel(ticket_path, sheet_name="Matrix")
     family_frame = pd.read_excel(family_path, sheet_name="Family_vs_Tickets")
@@ -121,6 +161,7 @@ def main() -> None:
             "detection": text(row.get("Detection")) or "Unknown",
             "projectClass": text(row.get("Project_Class")),
             "reworkOutcome": text(row.get("Rework_Outcome")),
+            "reworkErrors": [column for column in ['Geometry_Dimensions', 'Connector_MEP', 'Parameter_Naming', 'Graphics_2D_Visibility', 'Family_Naming_Convention', 'Category_Template_Structure', 'Ticket Missing Meta Data', 'RevitVersion_File_Upload', 'Other_Unclear'] if str(row.get(column, '')).strip().upper() == 'X'],
             "relationship": "Direct",
         }
         families.append(record)
@@ -128,6 +169,13 @@ def main() -> None:
             family_by_key[key] = record
         for ticket_id in ticket_ids:
             ticket_to_families[ticket_id].append(family_id)
+
+    tidp_keys = {normalize_family_name(row.get("Detailed work item")) for _, row in tidp_frame.iterrows()
+                 if text(row.get("Work type")) == "Revise the RFA library"}
+    aliases = equivalence_links(equivalence_frame, family_by_key, tidp_keys)
+    family_by_id = {family["id"]: family for family in families}
+    for alias in aliases.values():
+        family_by_id[alias["familyId"]]["tidpEquivalence"] = alias
 
     deliverables: list[dict[str, Any]] = []
     relation_counts = Counter()
@@ -141,6 +189,11 @@ def main() -> None:
         title = text(row.get("Detailed work item")) or f"TIDP row {index + 1}"
         family_key = normalize_family_name(title) if work_type == "Revise the RFA library" else None
         family = family_by_key.get(family_key or "")
+        alias = aliases.get(family_key or "")
+        match_method = "Exact normalized name" if family else None
+        if not family and alias:
+            family = family_by_id[alias["familyId"]]
+            match_method = "Temporary equivalence"
         if family:
             relationship = "Derived"
         elif family_key:
@@ -163,6 +216,8 @@ def main() -> None:
                     (item["activity"] for item in active_weeks if item["week"] == CURRENT_WEEK), None
                 ),
                 "familyId": family["id"] if family else None,
+                "familyMatchMethod": match_method,
+                "equivalenceRow": alias["sourceRow"] if match_method == "Temporary equivalence" else None,
                 "relationship": relationship,
             }
         )
@@ -198,10 +253,19 @@ def main() -> None:
             "reportingWeek": CURRENT_WEEK,
             "generated": datetime.now().isoformat(timespec="seconds"),
             "sources": [ticket_path.name, family_path.name, tidp_path.name],
+            "equivalence": {
+                "source": equivalence_path.name,
+                "sheet": "Equivalence",
+                "gitBlob": equivalence_hash,
+                "approvalDate": "2026-10-04",
+                "policy": "All workbook mappings temporarily accepted by user; source decisions retained, no automatic corrections.",
+                "rows": len(aliases),
+                "additionalUniqueLinks": sum(alias["uploadedKey"] != alias["tidpKey"] for alias in aliases.values()),
+            },
             "limitations": [
                 "TIDP has weekly plan markers but no actual-finish or explicit completion field.",
                 "Tickets have actual start/end evidence but no contractual due date.",
-                "Family upload source contains uploaded families; TIDP-to-family matching is derived from normalized exact names.",
+                "TIDP-to-family links use exact normalized names and the user-approved temporary equivalence workbook. Equivalence is not verified model identity or approval.",
                 "Family approval status and revision due dates are not present in the supplied sources.",
             ],
         },

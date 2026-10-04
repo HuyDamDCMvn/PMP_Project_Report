@@ -18,11 +18,11 @@ test('MIDP preserves source activity gaps and supports future team/lot adapters'
 import { midpWeeklyActual } from '../src/midp.js';
 
 test('MIDP actual counts unique uploads in their own ISO CW, not cumulative', () => {
-  const group = { workType: 'Revise the RFA library', records: [{ id: 'a', familyKey: 'x' }, { id: 'b', familyKey: 'x' }, { id: 'c', familyKey: 'y' }] };
-  const rows = midpWeeklyActual(group, [{ key: 'x', end: '2026-05-25' }, { key: 'x', end: '2026-06-01' }, { key: 'y', end: '2026-06-01' }], '2026-09-30');
+  const group = { workType: 'Revise the RFA library', records: [{ id: 'a', familyKey: 'x', familyId: 'f1' }, { id: 'b', familyKey: 'x', familyId: 'f1' }, { id: 'c', familyKey: 'y', familyId: 'f2' }] };
+  const rows = midpWeeklyActual(group, [{ id: 'f1', key: 'x', end: '2026-05-25' }, { id: 'f1', key: 'x', end: '2026-06-01' }, { id: 'f2', key: 'y', end: '2026-06-01' }], '2026-09-30');
   assert.deepEqual(rows.map(r => r.actualWeek), [22, 23]);
   assert.deepEqual(midpWeeklyActual({ workType: 'Framework deliverables' }, [], '2026-09-30'), []);
-  assert.equal(midpWeeklyActual(group, [{ key: 'x', end: '2026-10-01' }], '2026-09-30').length, 0);
+  assert.equal(midpWeeklyActual(group, [{ id: 'f1', key: 'x', end: '2026-10-01' }], '2026-09-30').length, 0);
 });
 
 test('MIDP ticket actual requires explicit single system, completed status and valid snapshot date', () => {

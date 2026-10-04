@@ -1,5 +1,9 @@
 # Dashboard architecture and wireframe
 
+`chart-order.js` owns sibling-panel ordering after shared layout wrappers are created. Stable layout keys identify panels; saved orders are deduplicated and reconciled with current panels so removed keys disappear and new panels append. Pointer/touch drag on the title and arrow keys on the same title button use one reorder operation, move existing DOM nodes, and persist per page/group. Group boundaries, chart size/collapse, filter state and evidence registries remain independent. The separate arrow toolbar is removed; Home restores only the current group's default chart order.
+
+The project-wide Weekly Annotation Project hours panel is an explicit exception to the uploaded-Family-only Productivity scope. `weekly-hours.js` consumes sanitized static API history, intersects Matrix ticket IDs with the shared filter scope, and registers ticket-week evidence in the existing drawer. `spentWeek` is distinct from uploadWeek/activityWeek: it joins work-date time entries to tickets, then linked Families/TIDP. Shared collapse/resize and CSV exports remain unchanged. API credentials are used only by the read-only Python build script, never client JavaScript.
+
 ## Decision architecture
 
 The application is ordered by `Decision → Evidence → Action`. Executive health and management attention appear before operational trends. Every interactive count opens a traceable record list or detail drawer.
@@ -90,6 +94,10 @@ Excel snapshots
 ```
 
 The browser never calculates relationships by fuzzy matching. Important thresholds live in one configuration object and domain functions are unit-tested.
+
+Table exports use a per-render registry of table models (ordered columns plus complete scoped rows, or a live detail-selection getter). `selectTableRows` is shared between the detail renderer and CSV export, including pending search values; pagination/infinite scrolling only limits DOM rendering. `serializeCsv` and `downloadCsv` in table-export.js own escaping, UTF-8 encoding, safe text cells, local download and URL cleanup. MIDP exports are built by midpTableExport from the same grouped plan and actual records used to render the paired table.
+
+Temporary equivalence extension (04/10/2026): the Python build applies the user-approved, hash-pinned `Annotation_RFA_equivalence_Checked.xlsx` mappings after exact matching. Endpoint validation rejects unknown project Families, unknown TIDP targets, duplicate mappings and exact-link collisions. Original Family keys and Ticket_IDs stay intact. `family-links.js/linkedUploadDates` resolves dates by generated familyId for both MIDP and cumulative progress; no chart independently guesses aliases. Source Decision, Method, Confidence and row are retained for audit. A workbook version change requires renewed approval rather than silently accepting new mappings.
 
 # Uploaded-Family analysis views
 

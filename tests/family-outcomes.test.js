@@ -1,6 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { familyOutcome, uploadedFamilyRows } from "../src/family-outcomes.js";
+import { familyOutcome, uploadedFamilyRows, tidpUploadDetails, familyProductivity } from "../src/family-outcomes.js";
+
+test("productivity averages include idle calendar days and never multiply shared ticket hours", () => {
+  const families = [{ id: "a", end: "2026-09-28", ticketIds: [1, 2] }, { id: "b", end: "2026-09-30", ticketIds: [1] }];
+  const m = familyProductivity(families, [{ id: 1, actualHours: 12 }, { id: 2, actualHours: null }], "2026-09-30");
+  assert.equal(m.calendarDays, 3);
+  assert.equal(m.uploadsPerDay, 2 / 3);
+  assert.equal(m.hoursPerFamily, 6);
+  assert.equal(familyProductivity([], [], "2026-09-30").uploadsPerDay, null);
+  assert.equal(familyProductivity(families, [], "2026-09-30").hoursPerFamily, null);
+});
+
+test("only Uploaded TIDP detail adds source ticket numbers without changing its population", () => {
+  const deliverables = [
+    { id: "a", familyKey: "a", familyId: "f1", workType: "Revise the RFA library" },
+    { id: "b", familyKey: "b", familyId: "f2", workType: "Revise the RFA library" },
+    { id: "c", familyKey: "c", familyId: null, workType: "Revise the RFA library" },
+  ];
+  const families = new Map([["f1", { ticketIds: [100, 20, 100] }], ["f2", { ticketIds: [] }]]);
+  const uploaded = tidpUploadDetails(deliverables, families, "Uploaded");
+  assert.deepEqual(uploaded.columns, ["id", "title", "system", "owner", "ticketNumber", "workType"]);
+  assert.deepEqual(uploaded.rows.map(r => [r.id, r.ticketNumber]), [["a", "20, 100"], ["b", null]]);
+  assert.equal(deliverables[0].ticketNumber, undefined);
+  const missing = tidpUploadDetails(deliverables, families, "Not uploaded");
+  assert.deepEqual(missing.columns, ["id", "title", "system", "owner", "workType"]);
+  assert.deepEqual(missing.rows, [deliverables[2]]);
+});
 
 test("uploaded outcomes use the source field, unique families and snapshot cutoff", () => {
   const families = [
