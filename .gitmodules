@@ -1,0 +1,9 @@
+[submodule "ayla-saas-admin-ui-ux-pro"]
+	path = ayla-saas-admin-ui-ux-pro
+	url = https://github.com/taleilon/Ayla-Saas-Admin-UI-UX-Pro.git
+[submodule "shareout"]
+	path = shareout
+	url = https://github.com/getshareout/shareout.git
+[submodule "ui-ux-kit"]
+	path = ui-ux-kit
+	url = https://github.com/arham777/ui-ux-kit.git
