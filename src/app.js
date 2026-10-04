@@ -1,4 +1,5 @@
 import "./styles.css";
+import { fetchPublishedData } from './data-update.js';
 import { linkedUploadDates } from "./family-links.js";
 import { aggregateMidp, midpWeeklyActual, midpTableExport, ticketSystem } from "./midp.js";
 import { familyErrorSystems, renderReworkHeatmap } from './rework-heatmap.js';
@@ -49,6 +50,8 @@ let familyRoleHours;
 let timeHistory;
 let context;
 let lookup;
+let updatingData = false;
+let updateMessage = '';
 const pieDetails = new Map();
 let pieDetailSelection = null;
 let pieDetailTrigger = null;
@@ -89,7 +92,7 @@ function appShell() {
       <aside class="sidebar">
         <div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}logo.svg" alt="DCMvn logo"></div>
         <nav class="nav">${nav}</nav>
-        <div class="source-note">Snapshot has been captured since 16:00 - 30.09.2026</div>
+        <div class="source-note"><button class="sidebar-update" type="button" data-update-data ${updatingData ? 'disabled' : ''} aria-busy="${updatingData}" title="Download the latest successfully published GitHub Pages data">${updatingData ? 'Updating…' : 'Update data'}</button><p data-update-status role="status" aria-live="polite">${escapeHtml(updateMessage)}</p>Snapshot: ${fmtDate(data.meta.asOf)}<br>Generated: ${escapeHtml(data.meta.generated || 'Unknown')}</div>
       </aside>
       <div class="workspace">
         ${topbar()}
@@ -780,11 +783,49 @@ function exportCsv(id, button) {
   }
 }
 
+async function updatePublishedData() {
+  if (updatingData) return;
+  updatingData = true;
+  const button = document.querySelector('[data-update-data]');
+  button.disabled = true;
+  button.textContent = 'Updating…';
+  button.setAttribute('aria-busy', 'true');
+  document.querySelector('[data-update-status]').textContent = 'Downloading latest published data…';
+  try {
+    const next = await fetchPublishedData();
+    const nextContext = buildContext(next.data);
+    const unchanged = next.data.meta.generated === data.meta.generated;
+    data = next.data;
+    familyRoleHours = next.familyRoleHours;
+    timeHistory = next.timeHistory;
+    context = nextContext;
+    lookup = createLookup();
+    pieDetails.clear();
+    pieDetailSelection = null;
+    updateMessage = unchanged ? 'Already using the latest published data.' : 'Updated from GitHub Pages. Filters and view settings preserved.';
+    updatingData = false;
+    document.querySelector('#app').innerHTML = appShell();
+    wireTopbar();
+    renderPage();
+    document.querySelector('[data-update-data]').focus({ preventScroll: true });
+  } catch (error) {
+    updateMessage = `Update failed. Existing data retained. ${error.message}`;
+    document.querySelector('[data-update-status]').textContent = updateMessage;
+  } finally {
+    updatingData = false;
+    const current = document.querySelector('[data-update-data]');
+    current.disabled = false;
+    current.textContent = 'Update data';
+    current.setAttribute('aria-busy', 'false');
+  }
+}
+
 function wireEvents() {
   document.addEventListener("toggle", (event) => {
     if (event.target.matches?.("[data-collapse]")) state.collapsed[event.target.dataset.collapse] = !event.target.open;
   }, true);
   document.addEventListener("click", (event) => {
+    if (event.target.closest('[data-update-data]')) { void updatePublishedData(); return; }
     const issue = event.target.closest("[data-issue-detail]");
     if (issue) {
       const id = issue.dataset.issueDetail;

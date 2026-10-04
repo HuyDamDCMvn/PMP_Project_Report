@@ -1,5 +1,9 @@
 # Design system
 
+Update data is now enabled, including narrow viewports. Loading disables repeat requests and displays an aria-live message. Success or failure is explicit; existing data remains until all downloads validate. Snapshot and generated timestamp are separate. No filters or presentation settings are reset.
+
+The sidebar footer reserves an Update data button above the snapshot note. It is disabled and labelled Coming soon until the update workflow is implemented; it performs no refresh, filter or remote action. The button wraps within the responsive sidebar and has a 44px minimum height.
+
 Error legend explanations use the user-provided detailed English definitions, including examples of geometry, connector, parameter, graphics, naming, category/template, audit metadata and Revit-version errors. Other_Unclear means a return outside the other eight categories. These shared explanations do not change source X classifications or counts.
 
 Weekly linked issues defaults to a Y-axis step of 5 counts. The editable control retains its existing range and changes grid spacing only, never the data.
