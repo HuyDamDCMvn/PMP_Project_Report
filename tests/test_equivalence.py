@@ -13,7 +13,7 @@ class EquivalenceTests(unittest.TestCase):
         self.row = {"Uploaded family": "Upload.rfa", "Equivalent TIDP family": "Plan.rfa",
                     "In TIDP (Y/N)": "Y", "Decision": "proposed", "Confidence %": 64,
                     "Method": "similarity", "Ticket ID": "5, 8"}
-        self.families = {"upload": {"id": "F1"}}
+        self.families = {"upload": {"id": "F1", "ticketIds": [5, 8]}}
 
     def test_temporary_approval_keeps_original_decision_and_evidence(self):
         link = equivalence_links(pd.DataFrame([self.row]), self.families, {"plan"})["plan"]

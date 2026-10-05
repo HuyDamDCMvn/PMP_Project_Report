@@ -18,7 +18,7 @@ test('upload reference reconciles every week with Weekly Family uploads', () => 
   const series = weeklyIssueSeries(data.families, '2026-09-30');
   const weeks = familyProductivity(data.families, [], '2026-09-30', { startWeek: 20 }).weeks;
   assert.deepEqual(series[0].weeks.map(w => [w.key, w.value]), weeks.map(w => [w.key, w.uploaded.length]));
-  assert.equal(series[0].weeks.reduce((sum, w) => sum + w.value, 0), 2001);
+  assert.equal(series[0].weeks.reduce((sum, w) => sum + w.value, 0), 2002);
   const sourceFlags = weeks.flatMap(w => w.uploaded).filter(f => f.reworkOutcome === 'Returned').reduce((sum, f) => sum + f.reworkErrors.length, 0);
   assert.equal(series.slice(1).flatMap(s => s.weeks).reduce((sum, w) => sum + w.value, 0), sourceFlags);
   assert.equal(series[0].weeks.at(-1).value, 83);

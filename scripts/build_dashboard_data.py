@@ -18,7 +18,7 @@ RAW = ROOT / "RawSource"
 OUTPUT = ROOT / "public" / "data" / "dashboard-data.json"
 AS_OF = date(2026, 9, 30)
 CURRENT_WEEK = 40
-EQUIVALENCE_GIT_BLOB = "8c9bc55511f3f5f107a5923739d65361aec7fa15"
+EQUIVALENCE_GIT_BLOB = "0b9ca178dc18a838e9d54613001269c0e4797658"
 
 
 def equivalence_links(frame, family_by_key, tidp_keys):
@@ -36,6 +36,8 @@ def equivalence_links(frame, family_by_key, tidp_keys):
             raise ValueError(f"Ambiguous equivalence at Excel row {index + 2}")
         if target in family_by_key and target != source:
             raise ValueError(f"Equivalence conflicts with an existing exact upload at row {index + 2}")
+        if set(parse_ticket_ids(row.get('Ticket ID'))) != set(family_by_key[source]['ticketIds']):
+            raise ValueError(f"Annotation_RFA_equivalence_Checked.xlsx / Equivalence row {index + 2}, {source}: Ticket ID differs from source Family ticketIds")
         uploaded_keys.add(source)
         links[target] = {
             "familyId": family_by_key[source]["id"],
@@ -95,6 +97,26 @@ def quarter_hours(value: Any) -> float | None:
     return float((Decimal(str(value)) * 4).to_integral_value(rounding=ROUND_FLOOR) / 4)
 
 
+def validate_family_source(frame, matrix):
+    weights = dict(zip(matrix['Ticket ID'], matrix['Weigh Score']))
+    keys, seen_tickets = set(), set()
+    for index, row in frame.iterrows():
+        key = normalize_family_name(row['Family Name'])
+        ids = parse_ticket_ids(row['Ticket_IDs'])
+        where = f"Family_Upload_vs_Annotation_Tickets_Checked.xlsx / Family_vs_Tickets row {index + 2}, {key}"
+        if not key or key in keys:
+            raise ValueError(f'{where}: duplicate or missing normalized Family Name')
+        keys.add(key)
+        if len(ids) != row['Ticket_Count'] or len(ids) != len(set(ids)):
+            raise ValueError(f"{where}: Ticket_Count={row['Ticket_Count']}, expected {len(set(ids))}")
+        if any(i not in weights or i in seen_tickets for i in ids):
+            raise ValueError(f'{where}: orphan or unapproved ticket fanout {ids}')
+        seen_tickets.update(ids)
+        expected = sum(weights[i] for i in ids)
+        if row['Weigh Score Sum'] != expected:
+            raise ValueError(f"{where}: Weigh Score Sum={row['Weigh Score Sum']}, expected {expected}")
+
+
 def main() -> None:
     ticket_path = RAW / "Annotation_Ticket_User_Matrix_Checked.xlsx"
     family_path = RAW / "Family_Upload_vs_Annotation_Tickets_Checked.xlsx"
@@ -112,6 +134,7 @@ def main() -> None:
         family_frame["Project Name"].fillna("").str.strip().eq("DCMvn_Annotation Project")
     ].copy()
     family_unmatched = pd.read_excel(family_path, sheet_name="Unmatched")
+    validate_family_source(family_frame, ticket_frame)
     tidp_frame = pd.read_excel(tidp_path, sheet_name="TIDP_Combined")
     week_columns = [column for column in tidp_frame.columns if str(column).startswith("CW")]
 
@@ -257,8 +280,8 @@ def main() -> None:
                 "source": equivalence_path.name,
                 "sheet": "Equivalence",
                 "gitBlob": equivalence_hash,
-                "approvalDate": "2026-10-04",
-                "policy": "All workbook mappings temporarily accepted by user; source decisions retained, no automatic corrections.",
+                "approvalDate": "2026-10-05",
+                "policy": "User-confirmed exclusion of ticket 72176 alias; remaining temporary mappings retained. Source weight and metadata corrections authorized 2026-10-05. Physical upload and semantic equivalence are not independently verified.",
                 "rows": len(aliases),
                 "additionalUniqueLinks": sum(alias["uploadedKey"] != alias["tidpKey"] for alias in aliases.values()),
             },

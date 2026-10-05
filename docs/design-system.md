@@ -190,3 +190,33 @@ Forecast points after the reporting snapshot show rounded brown value labels bel
 One Issues & Productivity sidebar page contains two independently collapsible groups, with Productivity first and Issues afterward. Native disclosure headers remain visible when closed and support keyboard operation. Both groups start expanded; their in-session open/closed states survive filtering and navigation without changing inner panel states. Each group has its own responsive 12-column layout, retaining existing panel resize preferences.
 
 Both groups use the shared collapsible/resizable analytical panels, evidence drawer and coordinated filter chips. Summary cards use four columns at desktop widths, three below 1200px, two below 640px, with existing container-query fallback to one column. Weekly charts share the same zero-baseline geometry; narrow layouts scroll the chart locally. Zero observations have no bar height. Issues uses the existing rework donut; Productivity emphasizes weekly Family uploads and recorded effort without conflating their units.
+
+05/10/2026: Data Quality is removed from navigation and page rendering. Shared donut leaders now use short radial exits followed by diagonal fans to height-sorted, evenly spaced label rows and short horizontal shoulders. This supersedes the orthogonal lane routing above and separates tiny adjacent slices without changing their values or interactions.
+The Reporter and returned-error rings interleave largest and smallest slices to separate tiny-slice anchor points; legend order and per-category colors stay unchanged.
+Label rows stay close to natural anchor heights and enforce at least nine SVG units of spacing when capacity permits, capped within the existing canvas; this replaces evenly spreading all rows.
+
+05/10/2026: All donut leader segments and shoulders run parallel to the X or Y axis, with right-angle bends only. Separate outer routing lanes replace diagonal/radial fans. Height-sorted label spacing and interleaved small slices remain; counts, colors, legend order and interactions are unchanged. This supersedes the diagonal-fan note above.
+
+Average uploads / day detail table alone replaces Family ID with Ticket ID from the Family source ticketIds. Multiple linked IDs remain comma-separated within one Family row; missing IDs display a dash. Search, sort and CSV use the displayed ticket IDs, preserving the Family record count.
+
+All donut outer category labels and value/share labels now match their corresponding legend font sizes in screen pixels. A shared ResizeObserver recalculates SVG text scale and measured label gutters after resizing or expanding. Long labels retain their full text and readable size using chart-local horizontal scrolling when necessary. Orthogonal leaders, record values and interactions stay unchanged.
+
+All panel header collapse controls use Collapse while expanded and Expand while collapsed, including the shared donut panels on every dashboard. Native details state controls the visible text; the former Details plus/minus label is removed.
+
+MIDP sidebar label is MIDP. Its tracking panel title is Master Information Delivery Plan Overview Tracking; the page heading remains Master Information Delivery Plan.
+
+MIDP Items cells expose a hover tooltip describing the planned TIDP row count, work-package/team/lot scope, active-filter boundary, source workbook/sheet and once-per-row rule regardless of repeated weekly markers. The total spans Actual and Plan and does not represent completion or uploads.
+
+MIDP Items tooltips explain only the meaning and counting method, including group/filter scope and no double counting across weeks. File names and source references are omitted from the tooltip.
+
+User layout persists across reloads/reopens in the same browser and site: last active dashboard, panel/group/package collapse state, axis steps, error-series visibility and numeric-label visibility. Existing chart-order and chart-size storage is retained. Record filters are excluded. Invalid or unavailable storage falls back to defaults; narrow viewports continue to reflow saved desktop layouts.
+
+Issues adds a collapsible/resizable Returned tickets by number of error types donut using the shared orthogonal leaders, legend-sized labels, cross-filters and ticket detail drawer. Returned-error donut and every returned-error heatmap detail replace Family ID with Ticket ID, preserving one row per Family and comma-separated links. The heatmap adds a bold Total row per error column; each total opens its scoped Family evidence. Layout preferences remain compatible.
+
+Returned errors by System row labels and owner names use bold weight 700 and are centered horizontally and vertically within their cells.
+The heatmap Total row label is centered horizontally and vertically within its cell.
+All numeric cells in the heatmap Total row use explicit bold weight 700 on their evidence buttons.
+Weekly linked issues legend uses five columns (two rows for ten series) on wide containers; existing two/one-column responsive layouts remain for narrow containers.
+Returned-error donut legend uses four columns at container widths >=950px (two balanced rows for eight types), two columns below that and one below 450px. Count and percentage align together on the right of each item.
+Weekly Family uploads: numbered accessible context markers at CW30 (Miramas reassignment) and CW36 (Munich RE / EKB returning work), with visible notes below the chart. User-supplied context does not change measured counts.
+Upload context annotations use English text, 14-unit radius pale green markers (#dcfce7), dark green text (#14532d), and 15-unit bold numbers.

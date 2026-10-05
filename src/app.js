@@ -1,4 +1,7 @@
 import "./styles.css";
+import { fitDonutLabels } from './donut-labels.js';
+import { restoreLayout, saveLayout } from './layout-preferences.js';
+import { familyTicketRows, returnedTicketErrors } from './returned-tickets.js';
 import { fetchPublishedData } from './data-update.js';
 import { linkedUploadDates } from "./family-links.js";
 import { aggregateMidp, midpWeeklyActual, midpTableExport, ticketSystem } from "./midp.js";
@@ -27,7 +30,6 @@ const PAGE_META = {
   overview: ["Executive Overview", "Project health, current delivery evidence and management action."],
   tidp: ["Master Information Delivery Plan", "Master delivery plan by work package and lot."],
   team: ["Issues & Productivity", "Issues and productivity for uploaded Families."],
-  quality: ["Data Quality", "Missing evidence, source contradictions and unsupported KPIs."],
 };
 
 const state = {
@@ -44,6 +46,8 @@ const state = {
   showIssueLabels: false,
   collapsed: {},
 };
+try { restoreLayout(state, localStorage); } catch { /* Storage may be disabled. */ }
+const persistLayout = () => { try { saveLayout(state, localStorage); } catch { /* Keep session state. */ } };
 
 let data;
 let familyRoleHours;
@@ -80,8 +84,8 @@ function createLookup() {
 }
 
 function appShell() {
-  const nav = [["tidp", "00"], ["overview", "01"], ["team", "03"], ["quality", "04"]].map(([key, number]) => {
-    const label = key === "tidp" ? "MIDP / TIDP" : PAGE_META[key][0];
+  const nav = [["tidp", "00"], ["overview", "01"], ["team", "03"]].map(([key, number]) => {
+    const label = key === "tidp" ? "MIDP" : PAGE_META[key][0];
     return `
     <button data-nav="${key}" class="${state.page === key ? "active" : ""}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
       <span class="nav-index">${number}</span><span>${label.replace("MIDP / TIDP Delivery Control", "MIDP / TIDP").replace("Annotation Ticket Control", "Annotation Tickets").replace("Cross-data Dependencies", "Dependencies").replace("Team & Resource", "Team & Resource")}</span>
@@ -124,7 +128,9 @@ function filtered() {
   );
   const allowedFamilyIds = new Set(deliverables.map((item) => item.familyId).filter(Boolean));
   const errorSystems = familyErrorSystems(data.deliverables);
+  const errorCountTickets = f.returnedErrorCount ? new Set(returnedTicketErrors(uploadedFamilyRows(data.families, data.meta.asOf), data.tickets).filter(ticket => ticket.returnedErrorCount === f.returnedErrorCount).map(ticket => ticket.id)) : null;
   let families = data.families.filter((item) =>
+    (!errorCountTickets || item.ticketIds.some(id => errorCountTickets.has(id))) &&
     (!f.uploadWeek || isoWeekKey(item.end) === f.uploadWeek) &&
     (!f.uploader || (item.uploader || "Unassigned") === f.uploader) &&
     (!f.familyOutcome || familyOutcome(item) === f.familyOutcome) &&
@@ -136,6 +142,7 @@ function filtered() {
   );
   const allowedTicketIds = new Set(families.flatMap((item) => item.ticketIds));
   const tickets = data.tickets.filter((item) =>
+    (!errorCountTickets || errorCountTickets.has(item.id)) &&
     (!f.spentWeek || (timeHistory?.entries || []).some(e => e.ticketId === item.id && e.week === f.spentWeek && e.hours !== 0)) &&
     matchesIssueFilters(item, f, data.meta.asOf) &&
     (!f.reporter || (item.reporter || "Unknown reporter") === f.reporter) &&
@@ -154,7 +161,7 @@ function filtered() {
     const familyIds = new Set(families.map((item) => item.id));
     deliverables = deliverables.filter((item) => familyIds.has(item.familyId) || (!item.familyKey && tickets.some(ticket => ticket.workType === item.workType && ticketSystem(ticket.summary) === item.system)));
   }
-  if (f.familyOutcome || f.uploadWeek || f.uploader || f.reworkError || f.errorSystem) {
+  if (f.familyOutcome || f.uploadWeek || f.uploader || f.reworkError || f.errorSystem || f.returnedErrorCount) {
     const familyIds = new Set(families.map(item => item.id));
     deliverables = deliverables.filter(item => familyIds.has(item.familyId));
   }
@@ -175,8 +182,16 @@ function piePanel(id, title, slices, unit, source, { showSourceContext = false, 
   let offset = 0;
   const anchors = [];
   // Separate the tiny work-type slices instead of clustering their anchors.
-  const ringSlices = id === "positive-work-type" && slices.length === 6
-    ? [0, 4, 1, 3, 2, 5].map((index) => slices[index]) : slices;
+  const separatedSlices = [];
+  if (["positive-reporters", "returned-errors", "returned-ticket-count"].includes(id)) {
+    for (let first = 0, last = slices.length - 1; first <= last; first++, last--) {
+      separatedSlices.push(slices[first]);
+      if (first !== last) separatedSlices.push(slices[last]);
+    }
+  }
+  const ringSlices = separatedSlices.length ? separatedSlices
+    : id === "positive-work-type" && slices.length === 6
+      ? [0, 4, 1, 3, 2, 5].map((index) => slices[index]) : slices;
   const marks = ringSlices.map((item) => {
     const length = total ? item.value / total * 100 : 0;
     if (item.value > 0) {
@@ -197,17 +212,25 @@ function piePanel(id, title, slices, unit, source, { showSourceContext = false, 
   const labelNames = { "Revise the RFA library": "RFA library", "Framework deliverables": "Framework deliverables", "Sample Model + Output Data": "Sample model + output", "Output Checklists": "Output checklists", "Create Revit templates for each LPH": "Revit templates", "Export layouts to Revizto & 3D Review": "Revizto + 3D review" };
   const labels = [false, true].map((right) => {
     const side = anchors.filter((item) => item.right === right).sort((a, b) => a.y - b.y);
+    const gap = Math.min(9, 54 / Math.max(1, side.length - 1));
+    const rows = side.map((item) => item.y);
+    for (let i = 1; i < rows.length; i++) rows[i] = Math.max(rows[i], rows[i - 1] + gap);
+    if (rows.length) rows[rows.length - 1] = Math.min(48, rows[rows.length - 1]);
+    for (let i = rows.length - 2; i >= 0; i--) rows[i] = Math.min(rows[i], rows[i + 1] - gap);
     return side.map((item, index) => {
-      const y = side.length === 1 ? item.y : -6 + index * 54 / (side.length - 1);
+      const y = rows[index];
       const end = right ? 50 : -14;
       const textX = right ? 51 : -15;
       const share = item.share < .1 ? "<0.1" : item.share.toFixed(1);
-      const laneDistance = y < item.y ? 1 + index * 1.5 : 10 - index * 1.5;
-      const lane = right ? 42 + laneDistance : -laneDistance;
+      // Route only horizontally and vertically, with separate outer lanes.
+      // Upward leaders use reverse lane order to avoid crossing neighbours.
+      const laneRank = y < item.y ? side.length - index : index + 1;
+      const distance = 2 + laneRank * Math.min(1.2, 5 / Math.max(1, side.length));
+      const lane = right ? 42 + distance : -distance;
       return `<g class="donut-label"><polyline points="${item.x},${item.y} ${lane},${item.y} ${lane},${y} ${end},${y}"/><circle cx="${item.x}" cy="${item.y}" r=".5" fill="${item.color}"/><text x="${textX}" y="${y - 1}" text-anchor="${right ? 'start' : 'end'}">${escapeHtml(labelNames[item.label] || item.label)}<tspan x="${textX}" dy="3.5">${number(item.value)} · ${share}%</tspan></text></g>`;
     }).join("");
   }).join("");
-return `<details class="panel pie-panel" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span>Details</span></summary><div class="pie-layout"><div class="donut-wrap"><svg viewBox="${id === 'returned-errors' ? '-64 -10 165 62' : '-46 -10 134 62'}" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button data-set-filter="${item.filter}" data-filter-value="${item.label}" class="pie-key ${state.filters[item.filter] === item.label ? "selected" : ""}" aria-pressed="${state.filters[item.filter] === item.label}"><i style="background:${item.color}"></i><span>${item.label}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div><details class="chart-source"><summary>${escapeHtml(disclosureTitle)}</summary><h3>Purpose and how to read this chart</h3><p>${source}</p>${renderLegendDefinitions(slices, escapeHtml, item => `Group ${item.label} from source field ${item.filter}; values are ${unit}, and percentages are shares of the displayed total.`)}${showSourceContext ? `<p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p>` : ""}</details></details>`;
+return `<details class="panel pie-panel" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span class="panel-expanded-label">Collapse</span><span class="panel-collapsed-label">Expand</span></summary><div class="pie-layout"><div class="donut-wrap"><svg viewBox="${id === 'returned-errors' ? '-64 -10 165 62' : '-46 -10 134 62'}" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button data-set-filter="${item.filter}" data-filter-value="${item.label}" class="pie-key ${state.filters[item.filter] === item.label ? "selected" : ""}" aria-pressed="${state.filters[item.filter] === item.label}"><i style="background:${item.color}"></i><span>${item.label}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div><details class="chart-source"><summary>${escapeHtml(disclosureTitle)}</summary><h3>Purpose and how to read this chart</h3><p>${source}</p>${renderLegendDefinitions(slices, escapeHtml, item => `Group ${item.label} from source field ${item.filter}; values are ${unit}, and percentages are shares of the displayed total.`)}${showSourceContext ? `<p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p>` : ""}</details></details>`;
 }
 
 function kpi(label, value, note, tone = "", action = "") {
@@ -383,6 +406,7 @@ function tidpView({ deliverables, tickets }) {
 
 function midpView(deliverables, tickets) {
   const groups = aggregateMidp(deliverables);
+  const itemExplanation = group => `${fmt(group.records.length)} planned TIDP items in ${group.workType} · ${group.team} / ${group.batch}. Calculation: count each planned work item once in this work-package and team/lot group after active dashboard filters. Items scheduled across multiple weeks are counted once.`;
   const allWeeks = data.deliverables.flatMap((r) => r.weeks.map((w) => w.week));
   const first = Math.min(...allWeeks), last = Math.max(...allWeeks);
   const weeks = Array.from({ length: last - first + 1 }, (_, i) => first + i);
@@ -419,7 +443,7 @@ function midpView(deliverables, tickets) {
     return tableExportButton(`midp-table:${type}`, `MIDP-${type}`, model.columns, model.rows);
   };
   return `${heading()}<div class="midp-context">${Object.entries(state.filters).filter(([,value]) => value).map(([key,value]) => `<button class="button" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(value)} ×</button>`).join("")}</div>
-  ${panel("Master Information Delivery Plan", "", `<div class="panel-body">${packages.length ? packages.map((type) => `<details class="midp-package" data-collapse="midp-${escapeHtml(type)}" ${state.collapsed[`midp-${type}`] ? "" : "open"}><summary>${escapeHtml(type)} · ${fmt(groups.filter(g => g.workType === type).reduce((sum,g) => sum + g.records.length,0))} items</summary>${exportPackage(type)}<div class="table-wrap midp-scroll" tabindex="0" aria-label="${escapeHtml(type)} Gantt"><table class="midp-table"><thead><tr><th>Team / lot</th><th>Owner</th><th>Items</th><th>Series</th>${weeks.map(w => `<th class="midp-week ${w === data.meta.reportingWeek ? "midp-current" : ""}">CW${String(w).padStart(2,'0')}</th>`).join('')}</tr></thead><tbody>${groups.filter(g => g.workType === type).map(g => `<tr class="midp-actual"><th rowspan="2"><button data-set-filter="system" data-filter-value="${escapeHtml(g.records[0].system)}">${escapeHtml(g.team)} / ${escapeHtml(g.batch)}</button></th><td rowspan="2">${unique(g.records.map(r => r.owner)).map(owner => `<button data-set-filter="owner" data-filter-value="${escapeHtml(owner)}">${escapeHtml(owner)}</button>`).join('<br>')}</td><td rowspan="2">${g.records.length}</td><td class="midp-series">Actual</td>${actualCell(g)}</tr><tr class="midp-plan"><td class="midp-series">Plan</td>${weeks.map(w => cell(g,w)).join('')}</tr>`).join('')}</tbody></table></div></details>`).join('') : '<div class="empty">No planned records match the current filters.</div>'}</div>`, "midp-panel")}`;
+  ${panel("Master Information Delivery Plan Overview Tracking", "", `<div class="panel-body">${packages.length ? packages.map((type) => `<details class="midp-package" data-collapse="midp-${escapeHtml(type)}" ${state.collapsed[`midp-${type}`] ? "" : "open"}><summary>${escapeHtml(type)} · ${fmt(groups.filter(g => g.workType === type).reduce((sum,g) => sum + g.records.length,0))} items</summary>${exportPackage(type)}<div class="table-wrap midp-scroll" tabindex="0" aria-label="${escapeHtml(type)} Gantt"><table class="midp-table"><thead><tr><th>Team / lot</th><th>Owner</th><th>Items</th><th>Series</th>${weeks.map(w => `<th class="midp-week ${w === data.meta.reportingWeek ? "midp-current" : ""}">CW${String(w).padStart(2,'0')}</th>`).join('')}</tr></thead><tbody>${groups.filter(g => g.workType === type).map(g => `<tr class="midp-actual"><th rowspan="2"><button data-set-filter="system" data-filter-value="${escapeHtml(g.records[0].system)}">${escapeHtml(g.team)} / ${escapeHtml(g.batch)}</button></th><td rowspan="2">${unique(g.records.map(r => r.owner)).map(owner => `<button data-set-filter="owner" data-filter-value="${escapeHtml(owner)}">${escapeHtml(owner)}</button>`).join('<br>')}</td><td rowspan="2" title="${escapeHtml(itemExplanation(g))}" aria-label="${escapeHtml(itemExplanation(g))}">${g.records.length}</td><td class="midp-series">Actual</td>${actualCell(g)}</tr><tr class="midp-plan"><td class="midp-series">Plan</td>${weeks.map(w => cell(g,w)).join('')}</tr>`).join('')}</tbody></table></div></details>`).join('') : '<div class="empty">No planned records match the current filters.</div>'}</div>`, "midp-panel")}`;
 }
 
 function legacyTidpView({ deliverables }) {
@@ -543,6 +567,15 @@ function familyAnalysisView(scoped) {
     { label: "Unclassified", value: uploaded.filter(item => familyOutcome(item) === "Unclassified").length, color: "var(--grey)", filter: "familyOutcome" },
   ].filter(slice => slice.label !== "Unclassified" || slice.value > 0), "uploaded families", "This chart shows review outcomes for uploaded Families in this project. The center is the unique uploaded Family count. Green (One pass) means recorded as passing without return; red (Returned) means returned for rework. Grey (Unclassified) appears when an outcome is missing. Numbers count Families once and percentages show their share of the total. Click a slice for Family details, or a legend item to filter the dashboard.");
   return renderFamilyAnalysis({ tickets, families: uploaded, familyChart, asOf: data.meta.asOf, filters: state.filters, collapsed: state.collapsed,
+    returnedTicketChart: (() => {
+      const scopedIds = new Set(uploaded.filter(f => familyOutcome(f) === 'Returned').flatMap(f => f.ticketIds));
+      const rows = returnedTicketErrors(uploadedFamilyRows(data.families, data.meta.asOf), tickets).filter(ticket => scopedIds.has(ticket.id));
+      const counts = groupCount(rows, row => row.returnedErrorCount);
+      const colors = ['var(--blue)', 'var(--green)', 'var(--amber)', 'var(--red)', 'var(--brown)', 'var(--grey)'];
+      const chart = piePanel('returned-ticket-count', 'Returned tickets by number of error types', [...counts].sort((a,b) => Number(a[0].split(' ')[0]) - Number(b[0].split(' ')[0])).map(([label,value],i) => ({ label, value, filter: 'returnedErrorCount', color: colors[i % colors.length] })), 'returned tickets', 'Each linked Matrix Ticket ID is counted once. The number of error types is the union of distinct recorded types across its uploaded Returned Families through the snapshot. Repeated flags of the same type count once per ticket. Zero error types means Returned with no classified error. Select a legend to filter related records; click a slice for ticket details. Tickets without a Returned Family link are outside this scope.');
+      pieDetails.set('returned-ticket-count', { title: 'Returned tickets by number of error types', rows });
+      return chart;
+    })(),
     errorHeatmap: renderReworkHeatmap({ families: uploaded, systems: familyErrorSystems(data.deliverables), filters: state.filters, panel, register: (id, meta) => pieDetails.set(id, meta), escapeHtml, fmt, asOf: data.meta.asOf }),
     issueAxisStep: state.issueAxisStep || 5,
     hiddenErrorSeries: state.hiddenErrorSeries,
@@ -576,35 +609,6 @@ function weekOfYear(iso) {
   return 1 + Math.round((target - firstThursday) / 604800000);
 }
 
-function qualityView() {
-  const q = data.quality;
-  const issues = [
-    ["Tickets missing actual start", q.ticketMissingStart, "Tickets"], ["Tickets missing actual end", q.ticketMissingEnd, "Tickets"],
-    ["Tickets missing handler", q.ticketMissingHandler, "Tickets"], ["Duplicate ticket IDs", q.ticketDuplicateIds, "Tickets"],
-    ["TIDP rows missing owner", q.tidpMissingOwner, "TIDP"], ["TIDP rows without weekly plan", q.tidpUnscheduled, "TIDP"],
-    ["Duplicate TIDP rows", q.tidpDuplicateRows, "TIDP"], ["Duplicate normalized family names", q.familyDuplicateNames, "Family"],
-    ["Family sheet contradictions", q.familySheetContradictions, "Family"], ["Family ticket IDs outside matrix", q.familyTicketIdsNotInMatrix, "Relationship"],
-    ["Unlinked TIDP RFA rows", q.unlinkedTidpFamilyRows, "Relationship"],
-  ];
-  const issueTotal = issues.reduce((sum, [, count]) => sum + count, 0);
-  const base = data.deliverables.length + data.tickets.length + data.families.length;
-  const score = Math.max(0, Math.round((1 - issueTotal / base) * 100));
-  const unsupported = [
-    ["Completed deliverables", "No TIDP actual finish or explicit completion"], ["On-time delivery", "No TIDP actual finish"],
-    ["Overdue tickets", "No contractual due date"], ["Tickets due this week", "No contractual due date"],
-    ["Family approval", "No approval field"], ["Previous reporting trend", "Only one snapshot supplied"],
-  ];
-  return `${heading()}<div class="grid-2">
-    ${panel("Data quality indicator", "Coverage proxy; relationship confidence remains separately visible", `<div class="panel-body quality-score"><div class="score-ring" style="--score:${score}%"><strong>${score}%</strong></div><div><strong>${fmt(issueTotal)} visible quality flags</strong><p class="cell-muted">Across ${fmt(base)} source records. This score is transparent and not used to suppress KPIs.</p></div></div>`)}
-    ${panel("Relationship evidence", "Classification of TIDP-family applicability", `<div class="panel-body">${barList(new Map(Object.entries(data.relationshipSummary)))}</div>`)}
-  </div>
-  ${panel("Issue categories", "Counts remain visible even when they make management metrics unavailable", `<div class="panel-body">${barList(new Map(issues.map(([label, count]) => [label, count])), { color: "amber", limit: 20 })}</div>`)}
-  <div class="grid-2">
-    ${panel("Unsupported KPI register", "Shown as unavailable instead of fabricated", `<div class="panel-body"><div class="definition-list">${unsupported.map(([name, reason]) => `<dt>${escapeHtml(name)}</dt><dd>${escapeHtml(reason)}</dd>`).join("")}</div></div>`)}
-    ${panel("Source limitations", "These boundaries apply to every page", `<div class="panel-body">${data.meta.limitations.map((item) => `<div class="evidence-gap">${escapeHtml(item)}</div>`).join("<div style='height:8px'></div>")}</div>`)}
-  </div>`;
-}
-
 let chartSizes = {};
 try { chartSizes = JSON.parse(localStorage.getItem("pmp-chart-drag-sizes") || "{}"); } catch { /* Fall back to automatic sizing. */ }
 
@@ -629,7 +633,7 @@ function applyComponentLayout() {
         toggle.textContent = collapsed ? "Expand" : "Collapse";
         toggle.setAttribute("aria-expanded", String(!collapsed));
       };
-      toggle.addEventListener("click", () => { state.collapsed[collapseKey] = !state.collapsed[collapseKey]; toggleCollapsed(); });
+      toggle.addEventListener("click", () => { state.collapsed[collapseKey] = !state.collapsed[collapseKey]; toggleCollapsed(); persistLayout(); });
       component.querySelector(".panel-header")?.append(toggle);
       toggleCollapsed();
     }
@@ -683,12 +687,14 @@ function applyComponentLayout() {
   });
   root.querySelectorAll(":scope > .grid-2, :scope > .secondary-kpis, .dashboard-group-body > .grid-2").forEach((grid) => grid.replaceWith(...grid.childNodes));
   enableChartOrdering(root, state.page);
+  fitDonutLabels(root);
 }
 
 function renderPage() {
+  persistLayout();
   tableExports.clear();
   const scoped = filtered();
-  const renderers = { overview: overviewView, tidp: tidpView, tickets: ticketsView, families: familiesView, dependencies: dependenciesView, team: familyAnalysisView, quality: qualityView };
+  const renderers = { overview: overviewView, tidp: tidpView, tickets: ticketsView, families: familiesView, dependencies: dependenciesView, team: familyAnalysisView };
   document.querySelector("#page-content").innerHTML = renderers[state.page](scoped);
   applyComponentLayout();
   document.querySelectorAll("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === state.page));
@@ -702,8 +708,11 @@ function openPieDetails(id, filter, value, trigger) {
   let rows;
   let columns;
   if (id === 'returned-errors') {
-    rows = uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => familyOutcome(r) === 'Returned' && r.reworkErrors?.includes(value));
-    columns = ['id', 'name', 'category', 'uploader', 'reworkOutcome', 'end'];
+    rows = familyTicketRows(uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => familyOutcome(r) === 'Returned' && r.reworkErrors?.includes(value)));
+    columns = ['ticketId', 'name', 'category', 'uploader', 'reworkOutcome', 'end'];
+  } else if (id === 'returned-ticket-count') {
+    rows = meta.rows.filter(row => row.returnedErrorCount === value);
+    columns = ['ticketId', 'summary', 'errorCount', 'errorTypes', 'reporter', 'handler', 'status', 'end'];
   } else if (id === "family-outcomes" || id === "family-uploaders") {
     rows = uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => id === "family-outcomes" ? familyOutcome(r) === value : (r.uploader || "Unassigned") === value);
     columns = ["id", "name", "category", "uploader", "reworkOutcome", "ticketStatus", "end"];
@@ -723,7 +732,7 @@ function renderPieDetails() {
   const rows = selectTableRows(s);
   const rowMarkup = (r) => `<tr>${s.columns.map((key) => `<td>${escapeHtml(r[key] ?? "—")}</td>`).join("")}</tr>`;
   const labels = { id: "ID", title: "Family / deliverable", summary: "Ticket", active: "Classification", reporter: "Reporter", handler: "Handler", status: "Status", actualHours: "Hours", created: "Created date", end: "End date", system: "System", owner: "Owner", workType: "Work type", plannedStartWeek: "First planned CW", plannedFinishWeek: "Last planned CW" };
-  Object.assign(labels, { name: "Family", category: "Category", uploader: "Uploader", reworkOutcome: "Outcome", ticketStatus: "Ticket status", ticketNumber: "Ticket number" });
+  Object.assign(labels, { name: "Family", category: "Category", uploader: "Uploader", reworkOutcome: "Outcome", ticketStatus: "Ticket status", ticketNumber: "Ticket number", ticketId: "Ticket ID", errorCount: "Error types count", errorTypes: "Error types" });
   document.querySelector("#drawer-root").innerHTML = `<div class="drawer-backdrop" data-close-drawer></div><aside class="drawer chart-detail-drawer" role="dialog" aria-modal="true" aria-labelledby="pie-detail-title"><button class="drawer-close" data-close-drawer aria-label="Close">×</button><h2 id="pie-detail-title">${escapeHtml(meta.title)} — ${escapeHtml(s.value)}</h2>${tableExportButton("detail", `${meta.title} - ${s.value}`, s.columns.map(key => ({ key, label: labels[key] || key })), () => selectTableRows(s))}<div class="table-wrap" tabindex="0" aria-label="Scrollable detail records"><table><thead><tr>${s.columns.map((key) => `<th aria-sort="${s.sort === key ? s.descending ? "descending" : "ascending" : "none"}"><button data-pie-sort="${key}">${labels[key]} ${s.sort === key ? s.descending ? "↓" : "↑" : "↕"}</button><input data-pie-search="${key}" aria-label="Search ${labels[key]} in details" value="${escapeHtml(s.searches[key] || "")}" /></th>`).join("")}</tr></thead><tbody>${rows.slice(0, 100).map(rowMarkup).join("") || `<tr><td colspan="${s.columns.length}" class="empty">No matching records.</td></tr>`}</tbody></table></div><div class="detail-count" role="status">${fmt(Math.min(100, rows.length))} / ${fmt(rows.length)} records</div></aside>`;
   const scroller = document.querySelector(".chart-detail-drawer .table-wrap");
   let shown = Math.min(100, rows.length);
@@ -792,7 +801,7 @@ async function updatePublishedData() {
   button.setAttribute('aria-busy', 'true');
   document.querySelector('[data-update-status]').textContent = 'Downloading latest published data…';
   try {
-    const next = await fetchPublishedData();
+    const next = await fetchPublishedData(fetch, import.meta.env.DEV ? `${import.meta.env.BASE_URL}data/` : undefined);
     const nextContext = buildContext(next.data);
     const unchanged = next.data.meta.generated === data.meta.generated;
     data = next.data;
@@ -802,7 +811,7 @@ async function updatePublishedData() {
     lookup = createLookup();
     pieDetails.clear();
     pieDetailSelection = null;
-    updateMessage = unchanged ? 'Already using the latest published data.' : 'Updated from GitHub Pages. Filters and view settings preserved.';
+    updateMessage = unchanged ? 'Already using the latest data.' : 'Data updated. Filters and view settings preserved.';
     updatingData = false;
     document.querySelector('#app').innerHTML = appShell();
     wireTopbar();
@@ -822,7 +831,10 @@ async function updatePublishedData() {
 
 function wireEvents() {
   document.addEventListener("toggle", (event) => {
-    if (event.target.matches?.("[data-collapse]")) state.collapsed[event.target.dataset.collapse] = !event.target.open;
+    if (event.target.isConnected && event.target.matches?.("[data-collapse]")) {
+      state.collapsed[event.target.dataset.collapse] = !event.target.open;
+      persistLayout();
+    }
   }, true);
   document.addEventListener("click", (event) => {
     if (event.target.closest('[data-update-data]')) { void updatePublishedData(); return; }

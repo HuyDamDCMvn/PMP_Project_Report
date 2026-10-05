@@ -110,3 +110,6 @@ Issues & Productivity is one sidebar page (internal ID `team`). `renderFamilyAna
 Issues contains rework composition, returned-Family count, linked open/aging/completed issues and weekly issue events. Productivity contains unique uploads, upload-week output, one-pass share, linked recorded effort, uploader distribution and effort by handler. Shared rendering primitives in `issues-view.js` own cards, breakdowns, weekly charts and typed evidence drawers.
 
 `uploadWeek` filters Family End Date by ISO year/week; `uploader` filters the source uploader. Both propagate through direct ticket IDs and Family-linked deliverables, compose with existing filters, survive navigation and clear through chips/reset. Ticket event week remains separately named `activityWeek`.
+
+05/10/2026: Active sidebar pages are MIDP / TIDP, Executive Overview and Issues & Productivity. Data Quality page is removed by user request; source validation remains part of the data pipeline.
+`n2026-10-05 source refresh: user confirmed removal of the 72176 / 420_PF_CS_cCap_Mapress alias to Cap_MapressFKMBlue. The corrected 72578 family is separate and has unknown rework outcome. Equivalence workbook pinned to 01a9ea0a39b5c1d106b45a6d3778162b40614e49. Uploaded cohort now 2002; TIDP-linked uploads remain 2001.

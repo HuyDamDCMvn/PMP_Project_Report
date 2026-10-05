@@ -44,11 +44,11 @@ test("snapshot reconciles donut, detail, weekly MIDP, cumulative uploads and coh
   }
   const cohort = familyProductivity(data.families, data.tickets, data.meta.asOf, { startWeek: 20, target: 2295 });
   assert.equal(cohort.weeklyRate, 143.25);
-  assert.deepEqual(cohort.forecastWeeks, [{ week: 41, value: 143.25 }, { week: 42, value: 143.25 }, { week: 43, value: 7.5 }]);
+  assert.deepEqual(cohort.forecastWeeks, [{ week: 41, value: 143.25 }, { week: 42, value: 143.25 }, { week: 43, value: 6.5 }]);
   assert.equal(cohort.weeks[0].key, "2026-CW20");
   assert.equal(cohort.weeks.length, 21);
   assert.equal(cohort.weeks[0].uploaded.length, 0);
-  assert.equal(cohort.families.length, 2001);
+  assert.equal(cohort.families.length, 2002);
   assert.equal(cohort.onePass.length, 1500);
   assert.equal(cohort.issues.hours, 15953.25);
   for (const week of cohort.weeks) {
@@ -57,13 +57,16 @@ test("snapshot reconciles donut, detail, weekly MIDP, cumulative uploads and coh
       const end = new Date(Date.UTC(2025, 11, 29 + w * 7 - 1)).toISOString().slice(0, 10);
       return end < data.meta.asOf ? end : data.meta.asOf;
     };
-    const cumulative = w => [...dates.values()].filter(date => date <= cutoff(w)).length;
+    const cumulative = w => data.families.filter(f => f.end && f.end <= cutoff(w)).length;
     assert.equal(week.uploaded.length, cumulative(n) - cumulative(n - 1), `${week.key}: Productivity equals change in Overview Actual`);
   }
-  // Explicit approval is for the workbook as supplied, not our suggested correction.
+  // User confirmed removal of the conflicting 72176 alias on 2026-10-05.
   const cap = data.families.find(f => f.name === "420_PF_CS_cCap_Mapress");
-  assert.equal(cap.tidpEquivalence.tidpName, "434_PF_CO_Cap_MapressFKMBlue");
+  assert.equal(cap.tidpEquivalence, undefined);
   assert.deepEqual(cap.ticketIds, [72176]);
-  assert.equal(cap.tidpEquivalence.sourceDecision, "proposed");
-  assert.equal(data.meta.equivalence.gitBlob, "8c9bc55511f3f5f107a5923739d65361aec7fa15");
+  const blue = data.families.find(f => f.name === "434_PF_CO_cCap_MapressFKMBlue");
+  assert.deepEqual(blue.ticketIds, [72578]);
+  assert.equal(blue.reworkOutcome, null);
+  assert.equal(blue.tidpEquivalence.tidpName, "434_PF_CO_Cap_MapressFKMBlue");
+  assert.equal(data.meta.equivalence.gitBlob, "0b9ca178dc18a838e9d54613001269c0e4797658");
 });
