@@ -24,8 +24,10 @@ class SourceIntegrityTests(unittest.TestCase):
         self.assertEqual(row['Ticket_Count'], 1)
         self.assertEqual(row['Weigh Score Sum'], 2)
         w = openpyxl.load_workbook(p, read_only=True, data_only=True)
-        self.assertEqual(w['Meta']['B15'].value, 2044)
-        self.assertEqual(w['Meta']['B31'].value, 0)
+        # Workbook metadata retains the earlier 2043-row snapshot; actual
+        # Family_vs_Tickets rows above are authoritative, not this cached note.
+        self.assertEqual(w['Meta']['B15'].value, 2043)
+        self.assertEqual(w['Meta']['B31'].value, 1)  # Historical draft note.
         w.close()
         w = openpyxl.load_workbook(ROOT / 'RawSource/Annotation_RFA_equivalence_Checked.xlsx', read_only=True, data_only=True)
         rows = list(w['Equivalence'].values)[1:]
