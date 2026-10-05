@@ -1,5 +1,21 @@
 # Design system
 
+Project Goals uses a subtle white-to-Blue-soft gradient (--goals-surface), 16px corners (--goals-radius), Blue left accent and shared raised shadow. Each goal has a 32px circular navy/blue numbered badge (--goals-badge-size), with sparse dividers and comfortable spacing. Responsive 20–26px title and 14–17px body remain readable. The native disclosure retains a circular plus/minus cue and reflows below the MIDP title on narrow screens; source wording is unchanged. Decorative styling is static, without shimmer or distracting motion.
+
+MIDP heading includes an initially expanded native Project Goals disclosure with the five user-supplied goals, wrapping below the title on narrow viewports. Sidebar copy reads Snapshot recorded at 16:00 on dd.mm.yyyy; this user-supplied capture time does not change calculation cutoffs or claim exact API reconstruction. Generated timestamp stays in dataset metadata.
+
+Cumulative Family Progress detail tables show direct linked Ticket IDs in their first column, not TIDP row IDs relabelled as tickets. Multiple IDs are retained once in numeric order; unlinked Plan Families show an em dash. Nonzero MEP Transmittal labels are keyboard-accessible detail actions, using the same cumulative Actual_TRM evidence as their points.
+
+Cumulative Family Progress omits zero numeric labels from Plan and Actual Uploaded as well as MEP Transmittal. Zero values, baseline points, axis ticks, weekly tables and exports remain unchanged.
+
+MEP Transmittal displays exact cumulative numeric labels at every nonzero actual week. Zero labels are omitted; points retain their exact accessible counts. Labels hide/show with the series legend and do not change values.
+
+Cumulative progress labels its blue legend Actual Uploaded (calculation remains Actual_CFM). Visible/Hidden text is removed; hidden-series buttons have dashed borders, shown-series buttons solid borders, with aria-pressed and Show/Hide accessible names retained. This supersedes the earlier strikethrough/status-text presentation.
+
+Cumulative Family Progress legend buttons toggle Plan, Actual, MEP Transmittal and Forecast independently, including their marks and labels. aria-pressed, Visible/Hidden text and strikethrough expose visibility. This presentation state survives in-session rerenders/navigation/collapse; calculations, filters, axis range, evidence table and CSV stay unchanged. Hiding all four shows a recovery message.
+
+Cumulative Family Progress adds a solid Green MEP Transmittal line from Actual_TRM, alongside solid Blue Actual from Actual_CFM. Grey Plan and its legend sample are dashed. Green points open dated Family evidence; the reporting-week count is labelled, with every week's exact count accessible on its point and in the weekly table/CSV. Existing collapse, sizing and filter scope are retained.
+
 Update data is now enabled, including narrow viewports. Loading disables repeat requests and displays an aria-live message. Success or failure is explicit; existing data remains until all downloads validate. Snapshot and generated timestamp are separate. No filters or presentation settings are reset.
 
 The sidebar footer reserves an Update data button above the snapshot note. It is disabled and labelled Coming soon until the update workflow is implemented; it performs no refresh, filter or remote action. The button wraps within the responsive sidebar and has a 44px minimum height.

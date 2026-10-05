@@ -175,6 +175,8 @@ def main() -> None:
             "key": key,
             "category": text(row.get("Category")) or "Unknown",
             "uploader": text(row.get("Uploader")),
+            "actualCfm": clean(row.get("Actual_CFM")),
+            "actualTrm": clean(row.get("Actual_TRM")),
             "start": clean(row.get("Start Date")),
             "end": clean(row.get("End Date")),
             "ticketIds": ticket_ids,

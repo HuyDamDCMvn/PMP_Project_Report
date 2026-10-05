@@ -1,4 +1,5 @@
 import "./styles.css";
+import { confirmedFamilyPlan } from './family-plan.js';
 import { fitDonutLabels } from './donut-labels.js';
 import { restoreLayout, saveLayout } from './layout-preferences.js';
 import { familyTicketRows, returnedTicketErrors } from './returned-tickets.js';
@@ -38,6 +39,7 @@ const state = {
   tablePage: 1,
   teamMetric: "deliverables",
   familyAxisStep: 100,
+  hiddenFamilySeries: [],
   uploadAxisStep: 25,
   hoursAxisStep: 200,
   effortAxisStep: 5,
@@ -96,7 +98,7 @@ function appShell() {
       <aside class="sidebar">
         <div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}logo.svg" alt="DCMvn logo"></div>
         <nav class="nav">${nav}</nav>
-        <div class="source-note"><button class="sidebar-update" type="button" data-update-data ${updatingData ? 'disabled' : ''} aria-busy="${updatingData}" title="Download the latest successfully published GitHub Pages data">${updatingData ? 'Updating…' : 'Update data'}</button><p data-update-status role="status" aria-live="polite">${escapeHtml(updateMessage)}</p>Snapshot: ${fmtDate(data.meta.asOf)}<br>Generated: ${escapeHtml(data.meta.generated || 'Unknown')}</div>
+        <div class="source-note"><button class="sidebar-update" type="button" data-update-data ${updatingData ? 'disabled' : ''} aria-busy="${updatingData}" title="Download the latest successfully published GitHub Pages data">${updatingData ? 'Updating…' : 'Update data'}</button><p data-update-status role="status" aria-live="polite">${escapeHtml(updateMessage)}</p>Snapshot recorded at 16:00 on ${escapeHtml(data.meta.asOf.split('-').reverse().join('.'))}</div>
       </aside>
       <div class="workspace">
         ${topbar()}
@@ -168,10 +170,10 @@ function filtered() {
   return { deliverables, tickets, families };
 }
 
-function heading() {
+function heading(extra = "") {
   const [title] = PAGE_META[state.page];
   const active = Object.entries(state.filters).filter(([, value]) => value);
-  return `<div class="page-heading"><div><p class="eyebrow">DCMvn_Annotation Project Overview Report</p><h1>${title}</h1></div></div>
+  return `<div class="page-heading"><div><p class="eyebrow">DCMvn_Annotation Project Overview Report</p><h1>${title}</h1></div>${extra}</div>
     ${active.length ? `<div class="filter-chips">${active.map(([key, value]) => `<button class="chip" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(key === "owner" ? personName(value) : value)} ×</button>`).join("")}<button class="button" id="reset-filters">Reset Filters</button></div>` : ""}`;
 }
 
@@ -307,20 +309,17 @@ function dataTable({ title, subtitle, columns, rows, kind, exportName = "records
 }
 
 function familyProgressChart(deliverables, families) {
-  const names = new Map();
-  deliverables.filter((item) => item.familyKey && item.workType === "Revise the RFA library").forEach((item) => {
-    const old = names.get(item.familyKey);
-    const first = item.plannedStartWeek;
-    names.set(item.familyKey, { first: first ? Math.min(first, old?.first || first) : old?.first, uploaded: Boolean(item.familyId) || Boolean(old?.uploaded) });
-  });
-  const uploadDates = linkedUploadDates(deliverables, families, data.meta.asOf);
+  const names = confirmedFamilyPlan(deliverables);
+  const uploadDates = linkedUploadDates(deliverables, families, data.meta.asOf, 'actualCfm');
+  const transmittalDates = linkedUploadDates(deliverables, families, data.meta.asOf, 'actualTrm');
   // ISO weeks in 2026 start on Monday; CW01 starts 29 December 2025.
   const weekEnd = (week) => new Date(Date.UTC(2025, 11, 29 + week * 7 - 1)).toISOString().slice(0, 10);
   const rows = Array.from({ length: 38 }, (_, i) => {
     const week = i + 5;
     const cutoff = weekEnd(week) < data.meta.asOf ? weekEnd(week) : data.meta.asOf;
     return { week, count: [...names.values()].filter((item) => item.first && item.first <= week).length,
-      actual: week > data.meta.reportingWeek ? null : [...uploadDates.values()].filter((date) => date <= cutoff).length };
+      actual: week > data.meta.reportingWeek ? null : [...uploadDates.values()].filter((date) => date <= cutoff).length,
+      transmittal: week > data.meta.reportingWeek ? null : [...transmittalDates.values()].filter(date => date <= cutoff).length };
   });
   const actual = rows.find((row) => row.week === data.meta.reportingWeek).actual;
   const completedWeek = weekEnd(data.meta.reportingWeek) > data.meta.asOf ? data.meta.reportingWeek - 1 : data.meta.reportingWeek;
@@ -333,7 +332,7 @@ function familyProgressChart(deliverables, families) {
   const weekLabel = (week) => week <= 53 ? `CW${String(week).padStart(2, "0")}` : `CW${String(week - 53).padStart(2, "0")}/2027`;
   const forecastMessage = forecast.week == null ? "Forecast unavailable: no uploads in the last four complete CWs." : actual >= target ? "Plan already reached." : `Forecast catch-up: ${weekLabel(forecast.week)} · ${fmt(weeklyRate)} families/week`;
   const axisStep = state.familyAxisStep;
-  const max = Math.max(axisStep, Math.ceil(names.size / axisStep) * axisStep);
+  const max = Math.max(axisStep, Math.ceil(Math.max(names.size, actual, transmittalDates.size) / axisStep) * axisStep);
   const ticks = Array.from({ length: Math.round(max / axisStep) + 1 }, (_, i) => i * axisStep);
   const plotHeight = Math.max(480, (ticks.length - 1) * 20);
   const bottom = 80 + plotHeight;
@@ -342,7 +341,9 @@ function familyProgressChart(deliverables, families) {
   const y = (v) => bottom - v / max * plotHeight;
   const detailRows = [...names.entries()].map(([key, item]) => {
     const source = deliverables.find((r) => r.familyKey === key);
-    return { id: source.id, title: source.title, system: source.system, owner: source.owner, plannedStartWeek: item.first, end: uploadDates.get(key) || "" };
+    const family = families.find(f => f.id === source.familyId);
+    const ticketId = [...new Set(family?.ticketIds || [])].sort((a, b) => Number(a) - Number(b)).join(', ') || '—';
+    return { id: source.id, ticketId, title: source.title, system: source.system, owner: source.owner, plannedStartWeek: item.first, end: uploadDates.get(key) || "", transmittal: transmittalDates.get(key) || "" };
   });
   pieDetails.set("family-progress", { title: "Cumulative Family Progress", rows: detailRows, weekEnd });
   const forecastValue = row => {
@@ -353,9 +354,10 @@ function familyProgressChart(deliverables, families) {
     { label: "CW", value: row => `CW${row.week}` }, { label: "Cumulative plan", key: "count" },
     { label: "Actual / Forecast", value: row => row.actual ?? forecastValue(row) ?? "—" },
     { label: "Value type", value: row => row.actual == null ? "Forecast" : "Actual" },
+    { label: "MEP Transmittal", value: row => row.transmittal ?? "—" },
   ], rows);
   const valueAction = (series, week, value) => value > 0 ? `role="button" tabindex="0" data-progress-detail="${series}" data-progress-week="${week}" aria-label="${series} CW${week}: ${fmt(value)} families. Open details"` : 'aria-disabled="true"';
-return panel("Cumulative Family Progress by CW", `Unique families · CW05–${weekLabel(endWeek)}/2026`, `<div class="panel-body family-progress"><div class="progress-legend"><span>Plan</span><span class="actual">Actual</span><span class="forecast">Forecast</span></div><p class="progress-forecast-summary">${escapeHtml(forecastMessage)}</p><label class="progress-axis-control" for="family-axis-step">Y-axis step (families)<input id="family-axis-step" type="number" min="10" max="5000" step="1" value="${axisStep}" /></label><div class="progress-scroll" tabindex="0" aria-label="Family progress chart"><svg style="min-width:${canvasWidth}px" viewBox="0 0 ${canvasWidth} ${bottom + 120}" role="group" aria-label="Cumulative family plan; ${actual} uploaded matches at CW${data.meta.reportingWeek}. Actual cumulative uploads by source End Date.">${ticks.map((tick) => `<line x1="90" x2="${canvasWidth - 60}" y1="${y(tick)}" y2="${y(tick)}" class="progress-grid"/><text x="80" y="${y(tick) + 4}" text-anchor="end">${fmt(tick)}</text>`).join('')}${rows.filter((r) => r.week !== data.meta.reportingWeek).map((r) => `<line x1="${x(r.week)}" x2="${x(r.week)}" y1="60" y2="${bottom}" class="progress-week-grid"/>`).join('')}<line x1="${x(data.meta.reportingWeek)}" x2="${x(data.meta.reportingWeek)}" y1="45" y2="${bottom}" class="progress-current"/><polyline points="${rows.map((r) => `${x(r.week)},${y(r.count)}`).join(' ')}" class="progress-plan"/>${rows.map((r) => `<circle cx="${x(r.week)}" cy="${y(r.count)}" r="3" class="progress-plan-dot"/>`).join('')}${rows.map((r, i) => `<text ${valueAction("Plan", r.week, r.count)} class="progress-value progress-plan-value" x="${x(r.week)}" y="${y(r.count) - (i % 2 ? 42 : 56)}" text-anchor="middle">${fmt(r.count)}</text>`).join('')}${forecast.points.length ? `<polyline points="${forecast.points.map((r) => `${x(r.week)},${y(r.value)}`).join(' ')}" class="progress-forecast-line"/><circle cx="${x(forecast.points.at(-1).week)}" cy="${y(forecast.points.at(-1).value)}" r="5" class="progress-forecast-dot"/>` : ''}${forecast.points.filter(r => r.week > data.meta.reportingWeek).map(r => `<text class="progress-value progress-forecast-label" x="${x(r.week)}" y="${y(r.value) + 28}" text-anchor="middle" aria-label="Forecast ${weekLabel(r.week)}: ${fmt(Math.round(r.value))} families">${fmt(Math.round(r.value))}</text>`).join("")}<polyline points="${rows.filter((r) => r.actual != null).map((r) => `${x(r.week)},${y(r.actual)}`).join(' ')}" class="progress-actual-line"/>${rows.filter((r) => r.actual != null).map((r) => `<circle cx="${x(r.week)}" cy="${y(r.actual)}" r="3" class="progress-actual"/>`).join('')}<rect x="${x(data.meta.reportingWeek) - 5}" y="${y(actual) - 5}" width="10" height="10" class="progress-actual"/>${rows.filter((r) => r.actual != null).map((r, i) => `<text ${valueAction("Actual", r.week, r.actual)} class="progress-value" x="${x(r.week)}" y="${y(r.actual) - (i % 2 ? 12 : 26)}" text-anchor="middle">${fmt(r.actual)}</text>`).join('')}${rows.map((r) => `<text x="${x(r.week)}" y="${bottom + 28}" text-anchor="middle">${weekLabel(r.week).replace("CW", "")}</text>`).join('')}${renderWeeklyMonthRow(rows.map(r => ({ key: `2026-CW${String(r.week).padStart(2, "0")}` })), i => x(rows[i].week), bottom)}<text x="${canvasWidth / 2}" y="${bottom + 108}" text-anchor="middle">CW · 2026</text><text x="20" y="${60 + plotHeight / 2}" transform="rotate(-90 20 ${60 + plotHeight / 2})" text-anchor="middle">Cumulative family count</text></svg></div><details class="chart-source"><summary>Chart purpose and legend definitions · weekly values</summary><p>This chart compares cumulative planned Families with uploaded Families by calendar week (CW). The horizontal axis shows weeks and the vertical axis shows cumulative Family counts. Grey Plan shows unique Families from their first planned week. Blue Actual shows linked uploads through the snapshot; the amber vertical line marks the reporting week. Brown dashed Forecast projects uploads at ${fmt(weeklyRate)} Families per week, based on the last four complete weeks (${weekLabel(completedWeek - 3)}–${weekLabel(completedWeek)}). Brown numbers are estimates, capped at the final planned total of ${fmt(target)}. Click a nonzero Plan or Actual number for Family details; Forecast numbers have no detail action. The table shows weekly totals with future estimates labelled Forecast.</p>${weeklyExport}<div class="table-wrap"><table><thead><tr><th>CW</th><th>Cumulative plan</th><th>Actual / Forecast</th></tr></thead><tbody>${rows.map((r) => `<tr><td>CW${r.week}</td><td>${fmt(r.count)}</td><td class="${r.actual == null ? "progress-forecast-value" : ""}">${r.actual == null ? `${forecastValue(r) == null ? "—" : fmt(forecastValue(r))} <span>(Forecast)</span>` : fmt(r.actual)}</td></tr>`).join('')}</tbody></table></div></details></div>`, "family-progress-panel");
+return panel("Cumulative Family Progress by CW", `Unique families · CW05–${weekLabel(endWeek)}/2026`, `<div class="panel-body family-progress"><div class="progress-legend" aria-label="Show or hide Family progress lines">${[["Plan", "plan"], ["Actual Uploaded", "actual"], ["MEP Transmittal", "transmittal"], ["Forecast", "forecast"]].map(([label, key]) => `<button type="button" class="${key}" data-toggle-family-series="${key}" aria-pressed="${!state.hiddenFamilySeries.includes(key)}" aria-label="${state.hiddenFamilySeries.includes(key) ? "Show" : "Hide"} ${label} line">${label}</button>`).join("")}</div>${state.hiddenFamilySeries.length === 4 ? '<p role="status">All lines are hidden. Select a legend to show a line.</p>' : ""}<p class="progress-forecast-summary">${escapeHtml(forecastMessage)}</p><label class="progress-axis-control" for="family-axis-step">Y-axis step (families)<input id="family-axis-step" type="number" min="10" max="5000" step="1" value="${axisStep}" /></label><div class="progress-scroll" tabindex="0" aria-label="Family progress chart"><svg style="min-width:${canvasWidth}px" viewBox="0 0 ${canvasWidth} ${bottom + 120}" role="group" aria-label="Cumulative family plan; ${actual} confirmed Families at CW${data.meta.reportingWeek}. Actual cumulative confirmations by source Actual_CFM; ${transmittalDates.size} MEP Transmittal Families by source Actual_TRM.">${ticks.map((tick) => `<line x1="90" x2="${canvasWidth - 60}" y1="${y(tick)}" y2="${y(tick)}" class="progress-grid"/><text x="80" y="${y(tick) + 4}" text-anchor="end">${fmt(tick)}</text>`).join('')}${rows.filter((r) => r.week !== data.meta.reportingWeek).map((r) => `<line x1="${x(r.week)}" x2="${x(r.week)}" y1="60" y2="${bottom}" class="progress-week-grid"/>`).join('')}<line x1="${x(data.meta.reportingWeek)}" x2="${x(data.meta.reportingWeek)}" y1="45" y2="${bottom}" class="progress-current"/><g class="family-progress-series" data-family-series="plan" ${state.hiddenFamilySeries.includes("plan") ? 'hidden' : ''}><polyline points="${rows.map((r) => `${x(r.week)},${y(r.count)}`).join(' ')}" class="progress-plan"/>${rows.map((r) => `<circle cx="${x(r.week)}" cy="${y(r.count)}" r="3" class="progress-plan-dot"/>`).join('')}${rows.map((r, i) => `<text ${valueAction("Plan", r.week, r.count)} class="progress-value progress-plan-value" x="${x(r.week)}" y="${y(r.count) - (i % 2 ? 42 : 56)}" text-anchor="middle">${r.count > 0 ? fmt(r.count) : ""}</text>`).join('')}</g><g class="family-progress-series" data-family-series="forecast" ${state.hiddenFamilySeries.includes("forecast") ? 'hidden' : ''}>${forecast.points.length ? `<polyline points="${forecast.points.map((r) => `${x(r.week)},${y(r.value)}`).join(' ')}" class="progress-forecast-line"/><circle cx="${x(forecast.points.at(-1).week)}" cy="${y(forecast.points.at(-1).value)}" r="5" class="progress-forecast-dot"/>` : ''}${forecast.points.filter(r => r.week > data.meta.reportingWeek).map(r => `<text class="progress-value progress-forecast-label" x="${x(r.week)}" y="${y(r.value) + 28}" text-anchor="middle" aria-label="Forecast ${weekLabel(r.week)}: ${fmt(Math.round(r.value))} families">${fmt(Math.round(r.value))}</text>`).join("")}</g><g class="family-progress-series" data-family-series="actual" ${state.hiddenFamilySeries.includes("actual") ? 'hidden' : ''}><polyline points="${rows.filter((r) => r.actual != null).map((r) => `${x(r.week)},${y(r.actual)}`).join(' ')}" class="progress-actual-line"/>${rows.filter((r) => r.actual != null).map((r) => `<circle cx="${x(r.week)}" cy="${y(r.actual)}" r="3" class="progress-actual"/>`).join('')}<rect x="${x(data.meta.reportingWeek) - 5}" y="${y(actual) - 5}" width="10" height="10" class="progress-actual"/>${rows.filter((r) => r.actual != null).map((r, i) => `<text ${valueAction("Actual", r.week, r.actual)} class="progress-value" x="${x(r.week)}" y="${y(r.actual) - (i % 2 ? 12 : 26)}" text-anchor="middle">${r.actual > 0 ? fmt(r.actual) : ""}</text>`).join('')}</g><g class="family-progress-series" data-family-series="transmittal" ${state.hiddenFamilySeries.includes("transmittal") ? 'hidden' : ''}>${`<polyline points="${rows.filter(r => r.transmittal != null).map(r => `${x(r.week)},${y(r.transmittal)}`).join(' ')}" class="progress-transmittal-line"/>`}${rows.filter(r => r.transmittal != null).map(r => `<circle ${valueAction("MEP Transmittal", r.week, r.transmittal)} cx="${x(r.week)}" cy="${y(r.transmittal)}" r="4" class="progress-transmittal-dot"/><text ${valueAction("MEP Transmittal", r.week, r.transmittal)} class="progress-value progress-transmittal-value" x="${x(r.week)}" y="${y(r.transmittal) + 18}" text-anchor="middle">${r.transmittal > 0 ? fmt(r.transmittal) : ""}</text>`).join("")}</g>${rows.map((r) => `<text x="${x(r.week)}" y="${bottom + 28}" text-anchor="middle">${weekLabel(r.week).replace("CW", "")}</text>`).join('')}${renderWeeklyMonthRow(rows.map(r => ({ key: `2026-CW${String(r.week).padStart(2, "0")}` })), i => x(rows[i].week), bottom)}<text x="${canvasWidth / 2}" y="${bottom + 108}" text-anchor="middle">CW · 2026</text><text x="20" y="${60 + plotHeight / 2}" transform="rotate(-90 20 ${60 + plotHeight / 2})" text-anchor="middle">Cumulative family count</text></svg></div><details class="chart-source"><summary>Chart purpose and legend definitions · weekly values</summary><p>Click a legend to hide or show its line, points and numeric labels. This changes presentation only, not data, filters, forecast calculations or exports. This chart compares cumulative planned CFM with actual confirmed Families by calendar week (CW). The horizontal axis shows weeks and the vertical axis shows cumulative Family counts. Grey dashed Plan counts unique TIDP RFA Families at their earliest scheduled CFM (Confirm) week, including combined REV | CFM markers. Families without CFM are excluded. Scheduled CFM is not proof of completed confirmation. Blue Actual counts distinct linked Families by source Actual_CFM through the snapshot; missing, invalid or future Actual_CFM is excluded, with no fallback to End Date; the amber vertical line marks the reporting week. Green MEP Transmittal counts distinct linked Families by source Actual_TRM through the snapshot, excluding missing, invalid and future dates without fallback. Click a green point for its Family details. Brown dashed Forecast projects confirmations at ${fmt(weeklyRate)} Families per week, based on the last four complete weeks (${weekLabel(completedWeek - 3)}–${weekLabel(completedWeek)}). Brown numbers are estimates, capped at the final planned total of ${fmt(target)}. Click a nonzero Plan or Actual number for Family details; Forecast numbers have no detail action. The table shows weekly totals with future estimates labelled Forecast.</p>${weeklyExport}<div class="table-wrap"><table><thead><tr><th>CW</th><th>Cumulative plan</th><th>Actual / Forecast</th><th>MEP Transmittal</th></tr></thead><tbody>${rows.map((r) => `<tr><td>CW${r.week}</td><td>${fmt(r.count)}</td><td class="${r.actual == null ? "progress-forecast-value" : ""}">${r.actual == null ? `${forecastValue(r) == null ? "—" : fmt(forecastValue(r))} <span>(Forecast)</span>` : fmt(r.actual)}</td><td>${r.transmittal == null ? "—" : fmt(r.transmittal)}</td></tr>`).join('')}</tbody></table></div></details></div>`, "family-progress-panel");
 }
 
 function overviewView(scoped) {
@@ -405,6 +407,7 @@ function tidpView({ deliverables, tickets }) {
 }
 
 function midpView(deliverables, tickets) {
+  const goals = '<details class="project-goals" open><summary>Project Goals</summary><ol><li>Define the target of object display in the drawing for each LPH</li><li>Ensure consistency for the method to control and setout drawing</li><li>Revise the rfa to fit the definition of object display</li><li>Set up the View Template to show the display of the object fit with the LPH requirement</li><li>Build the digital solution to control the use, publish and audit process</li></ol></details>';
   const groups = aggregateMidp(deliverables);
   const itemExplanation = group => `${fmt(group.records.length)} planned TIDP items in ${group.workType} · ${group.team} / ${group.batch}. Calculation: count each planned work item once in this work-package and team/lot group after active dashboard filters. Items scheduled across multiple weeks are counted once.`;
   const allWeeks = data.deliverables.flatMap((r) => r.weeks.map((w) => w.week));
@@ -442,7 +445,7 @@ function midpView(deliverables, tickets) {
     const model = midpTableExport(groups.filter(group => group.workType === type), weeks, actualByGroup, data.meta.reportingWeek);
     return tableExportButton(`midp-table:${type}`, `MIDP-${type}`, model.columns, model.rows);
   };
-  return `${heading()}<div class="midp-context">${Object.entries(state.filters).filter(([,value]) => value).map(([key,value]) => `<button class="button" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(value)} ×</button>`).join("")}</div>
+  return `${heading(goals)}<div class="midp-context">${Object.entries(state.filters).filter(([,value]) => value).map(([key,value]) => `<button class="button" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(value)} ×</button>`).join("")}</div>
   ${panel("Master Information Delivery Plan Overview Tracking", "", `<div class="panel-body">${packages.length ? packages.map((type) => `<details class="midp-package" data-collapse="midp-${escapeHtml(type)}" ${state.collapsed[`midp-${type}`] ? "" : "open"}><summary>${escapeHtml(type)} · ${fmt(groups.filter(g => g.workType === type).reduce((sum,g) => sum + g.records.length,0))} items</summary>${exportPackage(type)}<div class="table-wrap midp-scroll" tabindex="0" aria-label="${escapeHtml(type)} Gantt"><table class="midp-table"><thead><tr><th>Team / lot</th><th>Owner</th><th>Items</th><th>Series</th>${weeks.map(w => `<th class="midp-week ${w === data.meta.reportingWeek ? "midp-current" : ""}">CW${String(w).padStart(2,'0')}</th>`).join('')}</tr></thead><tbody>${groups.filter(g => g.workType === type).map(g => `<tr class="midp-actual"><th rowspan="2"><button data-set-filter="system" data-filter-value="${escapeHtml(g.records[0].system)}">${escapeHtml(g.team)} / ${escapeHtml(g.batch)}</button></th><td rowspan="2">${unique(g.records.map(r => r.owner)).map(owner => `<button data-set-filter="owner" data-filter-value="${escapeHtml(owner)}">${escapeHtml(owner)}</button>`).join('<br>')}</td><td rowspan="2" title="${escapeHtml(itemExplanation(g))}" aria-label="${escapeHtml(itemExplanation(g))}">${g.records.length}</td><td class="midp-series">Actual</td>${actualCell(g)}</tr><tr class="midp-plan"><td class="midp-series">Plan</td>${weeks.map(w => cell(g,w)).join('')}</tr>`).join('')}</tbody></table></div></details>`).join('') : '<div class="empty">No planned records match the current filters.</div>'}</div>`, "midp-panel")}`;
 }
 
@@ -860,16 +863,25 @@ function wireEvents() {
       pieDetailSelection = { id, value: week ? `CW${week}` : "All planned items", rows, columns: actual ? actualColumns : ["id", "title", "system", "owner", "workType", "plannedStartWeek", "plannedFinishWeek"], sort: "", descending: true, searches: {} };
       renderPieDetails(); document.querySelector('.drawer-close')?.focus(); return;
     }
+    const familyLegend = event.target.closest("[data-toggle-family-series]");
+    if (familyLegend) {
+      const key = familyLegend.dataset.toggleFamilySeries;
+      state.hiddenFamilySeries = state.hiddenFamilySeries.includes(key) ? state.hiddenFamilySeries.filter(value => value !== key) : [...state.hiddenFamilySeries, key];
+      renderPage();
+      document.querySelector(`[data-toggle-family-series="${key}"]`)?.focus({ preventScroll: true });
+      return;
+    }
     const progress = event.target.closest("[data-progress-detail]");
     if (progress) {
       const meta = pieDetails.get("family-progress");
       const week = Number(progress.dataset.progressWeek);
       const series = progress.dataset.progressDetail;
       const cutoff = meta.weekEnd(week) < data.meta.asOf ? meta.weekEnd(week) : data.meta.asOf;
-      const rows = meta.rows.filter((r) => series === "Plan" ? r.plannedStartWeek && r.plannedStartWeek <= week : r.end && r.end <= cutoff);
+      const dateField = series === "MEP Transmittal" ? "transmittal" : "end";
+      const rows = meta.rows.filter((r) => series === "Plan" ? r.plannedStartWeek && r.plannedStartWeek <= week : r[dateField] && r[dateField] <= cutoff).map(r => ({ ...r, end: r[dateField] }));
       if (!rows.length) return;
       pieDetailTrigger = progress;
-      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns: ["id", "title", "system", "owner", "plannedStartWeek", "end"], page: 1, sort: "", descending: true, searches: {} };
+      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns: ["ticketId", "title", "system", "owner", "plannedStartWeek", "end"], page: 1, sort: "", descending: true, searches: {} };
       renderPieDetails(); document.querySelector(".drawer-close")?.focus(); return;
     }
     const slice = event.target.closest("[data-pie-detail]");

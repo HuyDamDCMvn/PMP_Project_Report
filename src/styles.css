@@ -18,6 +18,11 @@
   --role-label-orange: #9c5b00;
   --project-title-size: 20px;
   --report-eyebrow-size: 14px;
+  --goals-title-size: clamp(20px, 1.2vw, 26px);
+  --goals-body-size: clamp(14px, .8vw, 17px);
+  --goals-surface: linear-gradient(125deg, var(--surface) 35%, var(--blue-soft) 100%);
+  --goals-radius: 16px;
+  --goals-badge-size: 32px;
   --amber-soft: #fff5dc;
   --brown: #86542d;
   --red: #b42318;
@@ -66,7 +71,15 @@ button { cursor: pointer; }
 .button:hover { border-color: var(--blue); color: var(--blue); }
 .button.primary { color: white; border-color: var(--blue); background: var(--blue); }
 .content { padding: 24px clamp(12px, 2vw, 32px) 48px; width: 100%; max-width: none; margin: 0; }
-.page-heading { margin-bottom: 22px; display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+.page-heading { margin-bottom: 22px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; align-items: flex-start; }
+.project-goals { flex: 1 1 560px; max-width: 980px; min-width: 0; color: var(--ink); background: var(--goals-surface); border: 1px solid var(--line); border-inline-start: 5px solid var(--blue); border-radius: var(--goals-radius); padding: 16px 24px; box-shadow: var(--shadow-raised), inset 0 1px 0 var(--surface); }
+.project-goals summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; font-size: var(--goals-title-size); color: var(--blue); }
+.project-goals summary::after { content: "+"; margin-inline-start: auto; display: grid; place-items: center; width: var(--goals-badge-size); height: var(--goals-badge-size); flex-shrink: 0; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); }
+.project-goals[open] summary::after { content: "−"; }
+.project-goals ol { margin: 12px 0 0; padding: 0; font-size: var(--goals-body-size); line-height: 1.65; overflow-wrap: anywhere; list-style: none; counter-reset: goal; }
+.project-goals li { counter-increment: goal; position: relative; padding: 10px 0 10px calc(var(--goals-badge-size) + 14px); margin: 0; min-height: 52px; }
+.project-goals li + li { border-top: 1px solid var(--line); }
+.project-goals li::before { content: counter(goal, decimal-leading-zero); position: absolute; inset-inline-start: 0; top: 10px; width: var(--goals-badge-size); height: var(--goals-badge-size); display: grid; place-items: center; border-radius: 50%; color: var(--surface); background: linear-gradient(145deg, var(--blue), var(--nav)); box-shadow: var(--shadow); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .eyebrow { margin: 0 0 4px; color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .page-heading .eyebrow { font-size: var(--report-eyebrow-size); overflow-wrap: anywhere; }
 h1 { margin: 0 0 6px; font-size: 30px; line-height: 1.15; letter-spacing: -.025em; }
@@ -280,6 +293,11 @@ tbody tr.clickable { cursor: pointer; }
 .progress-legend .actual { color: var(--blue); }
 .progress-legend .forecast { color: var(--brown); }
 .progress-legend span::before { content: ""; display: inline-block; width: 20px; margin-right: 6px; border-top: 3px solid currentColor; vertical-align: middle; }
+.progress-legend button { color: inherit; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; background: transparent; border: 1px solid var(--line); }
+.progress-legend button::before { content: ""; width: 20px; border-top: 3px solid currentColor; }
+.progress-legend button small { color: var(--muted); }
+.progress-legend button[aria-pressed="false"] { border-style: dashed; }
+.family-progress-series[hidden] { display: none; }
 .progress-legend .forecast::before { border-top-style: dashed; }
 .progress-forecast-summary { margin: 4px 0; color: var(--brown); font-weight: 700; }
 .progress-forecast-line { fill: none; stroke: var(--brown); stroke-width: 3; stroke-dasharray: 8 6; }
@@ -296,7 +314,12 @@ tbody tr.clickable { cursor: pointer; }
 .family-progress svg .progress-value.progress-forecast-label { fill: var(--brown); cursor: default; }
 .family-progress svg text { fill: var(--ink); font-size: 12px; }
 .progress-grid { stroke: var(--line); stroke-width: 1; }
-.progress-plan { fill: none; stroke: var(--grey); stroke-width: 3; }
+.progress-plan { fill: none; stroke: var(--grey); stroke-width: 3; stroke-dasharray: 8 5; }
+.progress-legend .plan::before { border-top-style: dashed; }
+.progress-legend .transmittal { color: var(--green); }
+.progress-transmittal-line { fill: none; stroke: var(--green); stroke-width: 3; }
+.progress-transmittal-dot { fill: var(--green); }
+.family-progress svg .progress-transmittal-value { fill: var(--green); }
 .progress-plan-dot { fill: var(--grey); }
 .progress-actual { fill: var(--blue); }
 .progress-actual-line { fill: none; stroke: var(--blue); stroke-width: 3; }

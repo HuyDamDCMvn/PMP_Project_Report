@@ -20,7 +20,9 @@ class SourceIntegrityTests(unittest.TestCase):
         self.assertEqual(len(scope), 2002)
         self.assertEqual(scope['Weigh Score Sum'].sum(), 4004)
         row = scope[scope['Family Name'] == '434_PF_CO_cCap_Mapress'].iloc[0]
-        self.assertEqual(row['Weigh Score Source'], '1 ticket → 2 (Mantis)')
+        self.assertEqual(row['Weigh Score Source'], '1 ticket; primary=2; sum=2')
+        self.assertEqual(row['Ticket_Count'], 1)
+        self.assertEqual(row['Weigh Score Sum'], 2)
         w = openpyxl.load_workbook(p, read_only=True, data_only=True)
         self.assertEqual(w['Meta']['B15'].value, 2044)
         self.assertEqual(w['Meta']['B31'].value, 0)
