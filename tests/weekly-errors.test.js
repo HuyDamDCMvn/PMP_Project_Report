@@ -13,13 +13,17 @@ test('weekly error series preserve X flags by upload week, distinct Family and s
   assert.equal(series.flatMap(s => s.weeks).reduce((sum, w) => sum + w.value, 0), 2);
 });
 
-test('upload reference reconciles every week with Weekly Family uploads', () => {
+test('total issues reconciles every week with the sum of error flags', () => {
   const data = JSON.parse(readFileSync(new URL('../public/data/dashboard-data.json', import.meta.url)));
   const series = weeklyIssueSeries(data.families, '2026-09-30');
   const weeks = familyProductivity(data.families, [], '2026-09-30', { startWeek: 20 }).weeks;
-  assert.deepEqual(series[0].weeks.map(w => [w.key, w.value]), weeks.map(w => [w.key, w.uploaded.length]));
-  assert.equal(series[0].weeks.reduce((sum, w) => sum + w.value, 0), 2002);
+  assert.equal(series[0].type, 'Total issues');
+  for (let i = 0; i < weeks.length; i++) {
+    assert.equal(series[0].weeks[i].value, series.slice(1).reduce((sum, s) => sum + s.weeks[i].value, 0));
+    assert.equal(series[0].weeks[i].rows.length, series[0].weeks[i].value);
+    assert.ok(series[0].weeks[i].rows.every(r => r.errorType));
+  }
   const sourceFlags = weeks.flatMap(w => w.uploaded).filter(f => f.reworkOutcome === 'Returned').reduce((sum, f) => sum + f.reworkErrors.length, 0);
   assert.equal(series.slice(1).flatMap(s => s.weeks).reduce((sum, w) => sum + w.value, 0), sourceFlags);
-  assert.equal(series[0].weeks.at(-1).value, 83);
+  assert.equal(series[0].weeks.reduce((sum, w) => sum + w.value, 0), sourceFlags);
 });

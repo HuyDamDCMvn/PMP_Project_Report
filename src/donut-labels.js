@@ -15,6 +15,17 @@ export function fitDonutLabels(root) {
       if (!wrap.clientWidth || !panel.open) return;
       const nameSize = parseFloat(getComputedStyle(name).fontSize);
       const valueSize = parseFloat(getComputedStyle(value).fontSize);
+      // Narrow charts retain a complete HTML legend; duplicate external labels
+      // are hidden rather than forcing a scrolling/cropped SVG.
+      const compact = wrap.clientWidth < 520;
+      svg.querySelectorAll('.donut-label').forEach(label=>{ label.style.display=compact ? 'none' : ''; });
+      if (compact) {
+        svg.setAttribute('viewBox','-1 -10 44 62');
+        svg.style.maxHeight='320px';
+        svg.style.width='100%'; wrap.tabIndex=-1;
+        return;
+      }
+      svg.style.maxHeight='';
       let scale = Math.max(3.5, wrap.clientWidth / 134);
       const texts = [...svg.querySelectorAll('.donut-label text')];
       let left = -1, right = 43;

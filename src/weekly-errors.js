@@ -20,8 +20,10 @@ export function weeklyErrors(families, asOf) {
 }
 
 export function weeklyIssueSeries(families, asOf) {
-  const { weeks } = familyProductivity(families, [], asOf, { startWeek: 20 });
-  return [{ type: 'Uploaded Families', color: 'var(--ink)', dash: '12 6', unit: 'Families',
-    weeks: weeks.map(({ key, uploaded }) => ({ key, value: uploaded.length, rows: uploaded })) },
-  ...weeklyErrors(families, asOf).map(s => ({ ...s, unit: 'error flags' }))];
+  const errors = weeklyErrors(families, asOf);
+  return [{ type: 'Total issues', color: 'var(--ink)', dash: '12 6', unit: 'error flags',
+    weeks: errors[0].weeks.map((week, i) => ({ key: week.key,
+      value: errors.reduce((sum, s) => sum + s.weeks[i].value, 0),
+      rows: errors.flatMap(s => s.weeks[i].rows.map(f => ({ ...f, errorType: s.type }))) })) },
+  ...errors.map(s => ({ ...s, unit: 'error flags' }))];
 }

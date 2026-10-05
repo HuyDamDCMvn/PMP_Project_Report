@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from source_evidence import add_evidence, apply_status_policy
+from build_bundle import build_bundle
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -250,6 +252,9 @@ def main() -> None:
     for ticket in tickets:
         ticket["familyIds"] = ticket_to_families.get(ticket["id"], [])
 
+    quality_records = add_evidence(families, family_frame, ticket_frame, family_unmatched, clean, normalize_family_name, AS_OF.isoformat())
+    apply_status_policy(tickets, families)
+
     internal_family_unmatched = {
         normalize_family_name(value)
         for value in family_unmatched.get("Family Name", pd.Series(dtype=str)).dropna()
@@ -305,12 +310,14 @@ def main() -> None:
         "tickets": tickets,
         "families": families,
         "quality": quality,
+        "qualityRecords": quality_records,
         "relationshipSummary": dict(relation_counts),
     }
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(output, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Wrote {OUTPUT} ({OUTPUT.stat().st_size:,} bytes)")
+    print(f"Offline bundle: {build_bundle(ROOT)['releaseId']}")
 
 
 if __name__ == "__main__":

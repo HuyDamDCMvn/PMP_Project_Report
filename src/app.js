@@ -1,9 +1,10 @@
 import "./styles.css";
+import { selectCohorts } from './cohorts.js';
 import { confirmedFamilyPlan } from './family-plan.js';
 import { fitDonutLabels } from './donut-labels.js';
 import { restoreLayout, saveLayout } from './layout-preferences.js';
 import { familyTicketRows, returnedTicketErrors } from './returned-tickets.js';
-import { fetchPublishedData } from './data-update.js';
+import { fetchPublishedData, createRefreshController } from './data-update.js';
 import { linkedUploadDates } from "./family-links.js";
 import { aggregateMidp, midpWeeklyActual, midpTableExport, ticketSystem } from "./midp.js";
 import { familyErrorSystems, renderReworkHeatmap } from './rework-heatmap.js';
@@ -21,6 +22,7 @@ import {
   dependencyState,
   groupCount,
   forecastCatchUp,
+  linearRegressionSlope,
   isOpenTicket,
   managementAttention,
   percentile,
@@ -56,6 +58,7 @@ let familyRoleHours;
 let timeHistory;
 let context;
 let lookup;
+let releaseId;
 let updatingData = false;
 let updateMessage = '';
 const pieDetails = new Map();
@@ -119,55 +122,7 @@ function topbar() {
 }
 
 function filtered() {
-  const f = state.filters;
-  const term = f.search.toLowerCase().trim();
-  let deliverables = data.deliverables.filter((item) =>
-    (!f.upload || (item.familyKey && (f.upload === "Uploaded" ? Boolean(item.familyId) : !item.familyId))) &&
-    (!f.system || item.system === f.system) &&
-    (!f.owner || samePerson(item.owner, f.owner) || (item.familyId && lookup.familyById.get(item.familyId)?.ticketIds.some(id => samePerson(lookup.ticketById.get(id)?.handler, f.owner)))) &&
-    (!f.workType || item.workType === f.workType) &&
-    (!term || `${item.id} ${item.title} ${item.system} ${item.owner}`.toLowerCase().includes(term))
-  );
-  const allowedFamilyIds = new Set(deliverables.map((item) => item.familyId).filter(Boolean));
-  const errorSystems = familyErrorSystems(data.deliverables);
-  const errorCountTickets = f.returnedErrorCount ? new Set(returnedTicketErrors(uploadedFamilyRows(data.families, data.meta.asOf), data.tickets).filter(ticket => ticket.returnedErrorCount === f.returnedErrorCount).map(ticket => ticket.id)) : null;
-  let families = data.families.filter((item) =>
-    (!errorCountTickets || item.ticketIds.some(id => errorCountTickets.has(id))) &&
-    (!f.uploadWeek || isoWeekKey(item.end) === f.uploadWeek) &&
-    (!f.uploader || (item.uploader || "Unassigned") === f.uploader) &&
-    (!f.familyOutcome || familyOutcome(item) === f.familyOutcome) &&
-    (!f.reworkError || (familyOutcome(item) === 'Returned' && item.reworkErrors?.includes(f.reworkError))) &&
-    (!f.errorSystem || (errorSystems.get(item.id) || 'Unknown system') === f.errorSystem) &&
-    (!(f.system || f.upload) || allowedFamilyIds.has(item.id)) &&
-    (!f.owner || samePerson(item.uploader, f.owner) || item.ticketIds.some((id) => samePerson(lookup.ticketById.get(id)?.handler, f.owner))) &&
-    (!term || `${item.id} ${item.name} ${item.category} ${item.uploader} ${item.ticketIds.join(" ")}`.toLowerCase().includes(term))
-  );
-  const allowedTicketIds = new Set(families.flatMap((item) => item.ticketIds));
-  const tickets = data.tickets.filter((item) =>
-    (!errorCountTickets || errorCountTickets.has(item.id)) &&
-    (!f.spentWeek || (timeHistory?.entries || []).some(e => e.ticketId === item.id && e.week === f.spentWeek && e.hours !== 0)) &&
-    matchesIssueFilters(item, f, data.meta.asOf) &&
-    (!f.reporter || (item.reporter || "Unknown reporter") === f.reporter) &&
-    (!f.active || hourClass(item) === f.active) &&
-    (!f.system || allowedTicketIds.has(item.id) || ticketSystem(item.summary) === f.system) &&
-    (!f.upload || allowedTicketIds.has(item.id)) &&
-    (!(f.familyOutcome || f.uploadWeek || f.uploader || f.reworkError || f.errorSystem) || allowedTicketIds.has(item.id)) &&
-    (!f.owner || samePerson(item.handler, f.owner)) &&
-    (!f.workType || item.workType === f.workType) &&
-    (!f.status || item.status === f.status) &&
-    (!term || `${item.id} ${item.summary} ${item.handler} ${item.reporter}`.toLowerCase().includes(term))
-  );
-  if (f.spentWeek || f.active || f.status || f.reporter || f.issueState || f.aging || f.activityWeek || f.owner || f.workType) {
-    const ids = new Set(tickets.map((item) => item.id));
-    families = families.filter((item) => item.ticketIds.some((id) => ids.has(id)));
-    const familyIds = new Set(families.map((item) => item.id));
-    deliverables = deliverables.filter((item) => familyIds.has(item.familyId) || (!item.familyKey && tickets.some(ticket => ticket.workType === item.workType && ticketSystem(ticket.summary) === item.system)));
-  }
-  if (f.familyOutcome || f.uploadWeek || f.uploader || f.reworkError || f.errorSystem || f.returnedErrorCount) {
-    const familyIds = new Set(families.map(item => item.id));
-    deliverables = deliverables.filter(item => familyIds.has(item.familyId));
-  }
-  return { deliverables, tickets, families };
+  return selectCohorts(data, state.filters, timeHistory);
 }
 
 function heading(extra = "") {
@@ -256,8 +211,8 @@ function stack(items) {
 }
 
 const panelChartNotes = {
-"Weekly Family uploads": "This line chart shows unique uploaded Families per ISO week. The horizontal axis shows weeks; the vertical axis, blue points and numbers show Family counts, not cumulative totals. The amber dashed line marks the partial reporting week, which covers only dates through the snapshot. With the current approved mapping and no filters, each weekly count equals the increase in Overview cumulative Actual. Brown dashed Forecast through CW43 shows weekly increments from the same four-complete-week scenario as Overview, capped at the planned total. Forecast labels are rounded estimates without detail actions. Actual nodes do not filter. Click a week label to filter, or an Actual count to view Families.",
-  "Weekly linked issues": "Weeks start at CW20 and use the same distinct Family upload cohorts and End Date as Weekly Family uploads. The dashed Ink Uploaded Families reference exactly matches each actual weekly upload count, including One pass Families. The other nine lines count source X flags among Returned Families once per Family/type; their sum is not a unique upload or ticket count because a Family may have multiple errors. No error forecast is inferred. Colors and dash patterns identify types. Hover or focus a node for its count; activate it for Family evidence. Legend buttons hide/show chart lines only, not dashboard filters. The Y-axis step changes grid spacing only. Up to three visible lines show numeric labels; dense selections use accessible node tooltips. CW40 is partial through the snapshot; month bands use ISO Thursday. Source: Family_Upload_vs_Annotation_Tickets_Checked.xlsx / Family_vs_Tickets. Rebuild with npm run data:build.",
+"Weekly Family uploads": "This line chart shows unique uploaded Families per ISO week. The horizontal axis shows weeks; the vertical axis, blue points and numbers show Family counts, not cumulative totals. The amber dashed line marks the partial reporting week, which covers only dates through the snapshot. Observed counts include all project uploads, including those outside TIDP. They do not equal the Overview Actual_CFM series. Brown dashed Forecast is a separate TIDP-linked upload scenario using linked End Date uploads and the four complete weeks, capped at the native RFA planning target. Forecast labels are rounded estimates without detail actions. Actual nodes do not filter. Click a week label to filter, or an Actual count to view Families.",
+  "Weekly linked issues": "Weeks start at CW20 and use the same distinct Family upload cohorts and End Date as Weekly Family uploads. The dashed Ink Total issues line sums all nine error flags for each week. A Family may contribute several flags; this is not a unique Family or ticket count. The other nine lines count source X flags among Returned Families once per Family/type; their sum is not a unique upload or ticket count because a Family may have multiple errors. No error forecast is inferred. Colors and dash patterns identify types. Hover or focus a node for its count; activate it for Family evidence. Legend buttons hide/show chart lines only, not dashboard filters. The Y-axis step changes grid spacing only. Up to three visible lines show numeric labels; dense selections use accessible node tooltips. CW40 is partial through the snapshot; month bands use ISO Thursday. Source: Family_Upload_vs_Annotation_Tickets_Checked.xlsx / Family_vs_Tickets. Rebuild with npm run data:build.",
   "Open issue aging": "This chart groups open tickets by days since creation at the reporting snapshot. Each number is the ticket count in that age range. Red highlights tickets older than 30 days; Unknown means the creation date is unavailable. Select an age range to filter, or a number for ticket details.",
   "Issue status": "This chart compares linked ticket counts by current status. Blue bar length shows the relative count; the number gives the exact count. Closed and resolved represent completed tickets; assigned represents ongoing work. Select a status or bar to filter, or a number for ticket details.",
   "Open issues by handler": "This chart compares open linked tickets by current handler. Amber bar length and numbers show each handler's open queue. Select a name or bar to filter, or a number for ticket details. A larger queue indicates more open tickets, not lower individual productivity.",
@@ -324,13 +279,13 @@ function familyProgressChart(deliverables, families) {
   const actual = rows.find((row) => row.week === data.meta.reportingWeek).actual;
   const completedWeek = weekEnd(data.meta.reportingWeek) > data.meta.asOf ? data.meta.reportingWeek - 1 : data.meta.reportingWeek;
   const cumulativeAt = (week) => [...uploadDates.values()].filter((date) => date <= weekEnd(week)).length;
-  const weeklyRate = (cumulativeAt(completedWeek) - cumulativeAt(completedWeek - 4)) / 4;
+  const weeklyRate = linearRegressionSlope(Array.from({ length: 4 }, (_, i) => ({ week: completedWeek - 3 + i, value: cumulativeAt(completedWeek - 3 + i) })));
   const target = rows.at(-1).count;
   const forecast = forecastCatchUp(actual, target, weeklyRate, data.meta.reportingWeek);
   const endWeek = Math.max(42, forecast.points.at(-1)?.week || 42);
   while (rows.at(-1).week < endWeek) rows.push({ week: rows.at(-1).week + 1, count: target, actual: null });
   const weekLabel = (week) => week <= 53 ? `CW${String(week).padStart(2, "0")}` : `CW${String(week - 53).padStart(2, "0")}/2027`;
-  const forecastMessage = forecast.week == null ? "Forecast unavailable: no uploads in the last four complete CWs." : actual >= target ? "Plan already reached." : `Forecast catch-up: ${weekLabel(forecast.week)} · ${fmt(weeklyRate)} families/week`;
+  const forecastMessage = ({ no_applicable_plan: 'No applicable plan for the current filters.', actual_unavailable: 'Actual CFM unavailable.', reached: 'Plan already reached.', rate_unavailable: 'Forecast unavailable: no source-field CFM in the last four complete CWs.' })[forecast.state] || `Forecast catch-up: ${weekLabel(forecast.week)} · ${fmt(weeklyRate)} families/week · regression slope (${weekLabel(completedWeek - 3)}–${weekLabel(completedWeek)})`;
   const axisStep = state.familyAxisStep;
   const max = Math.max(axisStep, Math.ceil(Math.max(names.size, actual, transmittalDates.size) / axisStep) * axisStep);
   const ticks = Array.from({ length: Math.round(max / axisStep) + 1 }, (_, i) => i * axisStep);
@@ -343,7 +298,7 @@ function familyProgressChart(deliverables, families) {
     const source = deliverables.find((r) => r.familyKey === key);
     const family = families.find(f => f.id === source.familyId);
     const ticketId = [...new Set(family?.ticketIds || [])].sort((a, b) => Number(a) - Number(b)).join(', ') || '—';
-    return { id: source.id, ticketId, title: source.title, system: source.system, owner: source.owner, plannedStartWeek: item.first, end: uploadDates.get(key) || "", transmittal: transmittalDates.get(key) || "" };
+    return { id: source.id, ticketId, title: source.title, system: source.system, owner: source.owner, plannedStartWeek: item.first, actualCfm: uploadDates.get(key) || null, actualTrm: transmittalDates.get(key) || null, cfmKind: family?.milestoneEvidence?.actualCfm?.kind || 'unknown', cfmCell: family?.milestoneEvidence?.actualCfm?.sourceCell || null };
   });
   pieDetails.set("family-progress", { title: "Cumulative Family Progress", rows: detailRows, weekEnd });
   const forecastValue = row => {
@@ -352,12 +307,12 @@ function familyProgressChart(deliverables, families) {
   };
   const weeklyExport = tableExportButton("progress-weekly", "Cumulative Family Progress", [
     { label: "CW", value: row => `CW${row.week}` }, { label: "Cumulative plan", key: "count" },
-    { label: "Actual / Forecast", value: row => row.actual ?? forecastValue(row) ?? "—" },
-    { label: "Value type", value: row => row.actual == null ? "Forecast" : "Actual" },
+    { label: "Actual CFM / Forecast", value: row => row.actual ?? forecastValue(row) ?? "—" },
+    { label: "Value type", value: row => row.actual == null ? (forecastValue(row)==null ? "Unavailable" : "Forecast") : "Source-field CFM" },
     { label: "MEP Transmittal", value: row => row.transmittal ?? "—" },
   ], rows);
   const valueAction = (series, week, value) => value > 0 ? `role="button" tabindex="0" data-progress-detail="${series}" data-progress-week="${week}" aria-label="${series} CW${week}: ${fmt(value)} families. Open details"` : 'aria-disabled="true"';
-return panel("Cumulative Family Progress by CW", `Unique families · CW05–${weekLabel(endWeek)}/2026`, `<div class="panel-body family-progress"><div class="progress-legend" aria-label="Show or hide Family progress lines">${[["Plan", "plan"], ["Actual Uploaded", "actual"], ["MEP Transmittal", "transmittal"], ["Forecast", "forecast"]].map(([label, key]) => `<button type="button" class="${key}" data-toggle-family-series="${key}" aria-pressed="${!state.hiddenFamilySeries.includes(key)}" aria-label="${state.hiddenFamilySeries.includes(key) ? "Show" : "Hide"} ${label} line">${label}</button>`).join("")}</div>${state.hiddenFamilySeries.length === 4 ? '<p role="status">All lines are hidden. Select a legend to show a line.</p>' : ""}<p class="progress-forecast-summary">${escapeHtml(forecastMessage)}</p><label class="progress-axis-control" for="family-axis-step">Y-axis step (families)<input id="family-axis-step" type="number" min="10" max="5000" step="1" value="${axisStep}" /></label><div class="progress-scroll" tabindex="0" aria-label="Family progress chart"><svg style="min-width:${canvasWidth}px" viewBox="0 0 ${canvasWidth} ${bottom + 120}" role="group" aria-label="Cumulative family plan; ${actual} confirmed Families at CW${data.meta.reportingWeek}. Actual cumulative confirmations by source Actual_CFM; ${transmittalDates.size} MEP Transmittal Families by source Actual_TRM.">${ticks.map((tick) => `<line x1="90" x2="${canvasWidth - 60}" y1="${y(tick)}" y2="${y(tick)}" class="progress-grid"/><text x="80" y="${y(tick) + 4}" text-anchor="end">${fmt(tick)}</text>`).join('')}${rows.filter((r) => r.week !== data.meta.reportingWeek).map((r) => `<line x1="${x(r.week)}" x2="${x(r.week)}" y1="60" y2="${bottom}" class="progress-week-grid"/>`).join('')}<line x1="${x(data.meta.reportingWeek)}" x2="${x(data.meta.reportingWeek)}" y1="45" y2="${bottom}" class="progress-current"/><g class="family-progress-series" data-family-series="plan" ${state.hiddenFamilySeries.includes("plan") ? 'hidden' : ''}><polyline points="${rows.map((r) => `${x(r.week)},${y(r.count)}`).join(' ')}" class="progress-plan"/>${rows.map((r) => `<circle cx="${x(r.week)}" cy="${y(r.count)}" r="3" class="progress-plan-dot"/>`).join('')}${rows.map((r, i) => `<text ${valueAction("Plan", r.week, r.count)} class="progress-value progress-plan-value" x="${x(r.week)}" y="${y(r.count) - (i % 2 ? 42 : 56)}" text-anchor="middle">${r.count > 0 ? fmt(r.count) : ""}</text>`).join('')}</g><g class="family-progress-series" data-family-series="forecast" ${state.hiddenFamilySeries.includes("forecast") ? 'hidden' : ''}>${forecast.points.length ? `<polyline points="${forecast.points.map((r) => `${x(r.week)},${y(r.value)}`).join(' ')}" class="progress-forecast-line"/><circle cx="${x(forecast.points.at(-1).week)}" cy="${y(forecast.points.at(-1).value)}" r="5" class="progress-forecast-dot"/>` : ''}${forecast.points.filter(r => r.week > data.meta.reportingWeek).map(r => `<text class="progress-value progress-forecast-label" x="${x(r.week)}" y="${y(r.value) + 28}" text-anchor="middle" aria-label="Forecast ${weekLabel(r.week)}: ${fmt(Math.round(r.value))} families">${fmt(Math.round(r.value))}</text>`).join("")}</g><g class="family-progress-series" data-family-series="actual" ${state.hiddenFamilySeries.includes("actual") ? 'hidden' : ''}><polyline points="${rows.filter((r) => r.actual != null).map((r) => `${x(r.week)},${y(r.actual)}`).join(' ')}" class="progress-actual-line"/>${rows.filter((r) => r.actual != null).map((r) => `<circle cx="${x(r.week)}" cy="${y(r.actual)}" r="3" class="progress-actual"/>`).join('')}<rect x="${x(data.meta.reportingWeek) - 5}" y="${y(actual) - 5}" width="10" height="10" class="progress-actual"/>${rows.filter((r) => r.actual != null).map((r, i) => `<text ${valueAction("Actual", r.week, r.actual)} class="progress-value" x="${x(r.week)}" y="${y(r.actual) - (i % 2 ? 12 : 26)}" text-anchor="middle">${r.actual > 0 ? fmt(r.actual) : ""}</text>`).join('')}</g><g class="family-progress-series" data-family-series="transmittal" ${state.hiddenFamilySeries.includes("transmittal") ? 'hidden' : ''}>${`<polyline points="${rows.filter(r => r.transmittal != null).map(r => `${x(r.week)},${y(r.transmittal)}`).join(' ')}" class="progress-transmittal-line"/>`}${rows.filter(r => r.transmittal != null).map(r => `<circle ${valueAction("MEP Transmittal", r.week, r.transmittal)} cx="${x(r.week)}" cy="${y(r.transmittal)}" r="4" class="progress-transmittal-dot"/><text ${valueAction("MEP Transmittal", r.week, r.transmittal)} class="progress-value progress-transmittal-value" x="${x(r.week)}" y="${y(r.transmittal) + 18}" text-anchor="middle">${r.transmittal > 0 ? fmt(r.transmittal) : ""}</text>`).join("")}</g>${rows.map((r) => `<text x="${x(r.week)}" y="${bottom + 28}" text-anchor="middle">${weekLabel(r.week).replace("CW", "")}</text>`).join('')}${renderWeeklyMonthRow(rows.map(r => ({ key: `2026-CW${String(r.week).padStart(2, "0")}` })), i => x(rows[i].week), bottom)}<text x="${canvasWidth / 2}" y="${bottom + 108}" text-anchor="middle">CW · 2026</text><text x="20" y="${60 + plotHeight / 2}" transform="rotate(-90 20 ${60 + plotHeight / 2})" text-anchor="middle">Cumulative family count</text></svg></div><details class="chart-source"><summary>Chart purpose and legend definitions · weekly values</summary><p>Click a legend to hide or show its line, points and numeric labels. This changes presentation only, not data, filters, forecast calculations or exports. This chart compares cumulative planned CFM with actual confirmed Families by calendar week (CW). The horizontal axis shows weeks and the vertical axis shows cumulative Family counts. Grey dashed Plan counts unique TIDP RFA Families at their earliest scheduled CFM (Confirm) week, including combined REV | CFM markers. Families without CFM are excluded. Scheduled CFM is not proof of completed confirmation. Blue Actual counts distinct linked Families by source Actual_CFM through the snapshot; missing, invalid or future Actual_CFM is excluded, with no fallback to End Date; the amber vertical line marks the reporting week. Green MEP Transmittal counts distinct linked Families by source Actual_TRM through the snapshot, excluding missing, invalid and future dates without fallback. Click a green point for its Family details. Brown dashed Forecast projects confirmations at ${fmt(weeklyRate)} Families per week, based on the last four complete weeks (${weekLabel(completedWeek - 3)}–${weekLabel(completedWeek)}). Brown numbers are estimates, capped at the final planned total of ${fmt(target)}. Click a nonzero Plan or Actual number for Family details; Forecast numbers have no detail action. The table shows weekly totals with future estimates labelled Forecast.</p>${weeklyExport}<div class="table-wrap"><table><thead><tr><th>CW</th><th>Cumulative plan</th><th>Actual / Forecast</th><th>MEP Transmittal</th></tr></thead><tbody>${rows.map((r) => `<tr><td>CW${r.week}</td><td>${fmt(r.count)}</td><td class="${r.actual == null ? "progress-forecast-value" : ""}">${r.actual == null ? `${forecastValue(r) == null ? "—" : fmt(forecastValue(r))} <span>(Forecast)</span>` : fmt(r.actual)}</td><td>${r.transmittal == null ? "—" : fmt(r.transmittal)}</td></tr>`).join('')}</tbody></table></div></details></div>`, "family-progress-panel");
+return panel("Cumulative Family Progress by CW", `Unique families · CW05–${weekLabel(endWeek)}/2026`, `<div class="panel-body family-progress"><div class="progress-legend" aria-label="Show or hide Family progress lines">${[["Plan", "plan"], ["Actual CFM", "actual"], ["MEP Transmittal", "transmittal"], ["Forecast", "forecast"]].map(([label, key]) => `<button type="button" class="${key}" data-toggle-family-series="${key}" aria-pressed="${!state.hiddenFamilySeries.includes(key)}" aria-label="${state.hiddenFamilySeries.includes(key) ? "Show" : "Hide"} ${label} line">${label}</button>`).join("")}</div>${state.hiddenFamilySeries.length === 4 ? '<p role="status">All lines are hidden. Select a legend to show a line.</p>' : ""}<p class="progress-forecast-summary">${escapeHtml(forecastMessage)}</p><label class="progress-axis-control" for="family-axis-step">Y-axis step (families)<input id="family-axis-step" type="number" min="10" max="5000" step="1" value="${axisStep}" /></label><div class="progress-scroll" tabindex="0" aria-label="Family progress chart"><svg style="min-width:${canvasWidth}px" viewBox="0 0 ${canvasWidth} ${bottom + 120}" role="group" aria-label="Cumulative family plan; ${actual} source-field CFM Families at CW${data.meta.reportingWeek}. Actual source-field CFM dates by source Actual_CFM; ${transmittalDates.size} MEP Transmittal Families by source Actual_TRM.">${ticks.map((tick) => `<line x1="90" x2="${canvasWidth - 60}" y1="${y(tick)}" y2="${y(tick)}" class="progress-grid"/><text x="80" y="${y(tick) + 4}" text-anchor="end">${fmt(tick)}</text>`).join('')}${rows.filter((r) => r.week !== data.meta.reportingWeek).map((r) => `<line x1="${x(r.week)}" x2="${x(r.week)}" y1="60" y2="${bottom}" class="progress-week-grid"/>`).join('')}<line x1="${x(data.meta.reportingWeek)}" x2="${x(data.meta.reportingWeek)}" y1="45" y2="${bottom}" class="progress-current"/><g class="family-progress-series" data-family-series="plan" ${state.hiddenFamilySeries.includes("plan") ? 'hidden' : ''}><polyline points="${rows.map((r) => `${x(r.week)},${y(r.count)}`).join(' ')}" class="progress-plan"/>${rows.map((r) => `<circle cx="${x(r.week)}" cy="${y(r.count)}" r="3" class="progress-plan-dot"/>`).join('')}${rows.map((r, i) => `<text ${valueAction("Plan", r.week, r.count)} class="progress-value progress-plan-value" x="${x(r.week)}" y="${y(r.count) - (i % 2 ? 42 : 56)}" text-anchor="middle">${r.count > 0 ? fmt(r.count) : ""}</text>`).join('')}</g><g class="family-progress-series" data-family-series="forecast" ${state.hiddenFamilySeries.includes("forecast") ? 'hidden' : ''}>${forecast.points.length ? `<polyline points="${forecast.points.map((r) => `${x(r.week)},${y(r.value)}`).join(' ')}" class="progress-forecast-line"/><circle cx="${x(forecast.points.at(-1).week)}" cy="${y(forecast.points.at(-1).value)}" r="5" class="progress-forecast-dot"/>` : ''}${forecast.points.filter(r => r.week > data.meta.reportingWeek).map(r => `<text class="progress-value progress-forecast-label" x="${x(r.week)}" y="${y(r.value) + 28}" text-anchor="middle" aria-label="Forecast ${weekLabel(r.week)}: ${fmt(Math.round(r.value))} families">${fmt(Math.round(r.value))}</text>`).join("")}</g><g class="family-progress-series" data-family-series="actual" ${state.hiddenFamilySeries.includes("actual") ? 'hidden' : ''}><polyline points="${rows.filter((r) => r.actual != null).map((r) => `${x(r.week)},${y(r.actual)}`).join(' ')}" class="progress-actual-line"/>${rows.filter((r) => r.actual != null).map((r) => `<circle cx="${x(r.week)}" cy="${y(r.actual)}" r="3" class="progress-actual"/>`).join('')}<rect x="${x(data.meta.reportingWeek) - 5}" y="${y(actual) - 5}" width="10" height="10" class="progress-actual"/>${rows.filter((r) => r.actual != null).map((r, i) => `<text ${valueAction("Actual CFM", r.week, r.actual)} class="progress-value" x="${x(r.week)}" y="${y(r.actual) - (i % 2 ? 12 : 26)}" text-anchor="middle">${r.actual > 0 ? fmt(r.actual) : ""}</text>`).join('')}</g><g class="family-progress-series" data-family-series="transmittal" ${state.hiddenFamilySeries.includes("transmittal") ? 'hidden' : ''}>${`<polyline points="${rows.filter(r => r.transmittal != null).map(r => `${x(r.week)},${y(r.transmittal)}`).join(' ')}" class="progress-transmittal-line"/>`}${rows.filter(r => r.transmittal != null).map(r => `<circle ${valueAction("MEP Transmittal", r.week, r.transmittal)} cx="${x(r.week)}" cy="${y(r.transmittal)}" r="4" class="progress-transmittal-dot"/><text ${valueAction("MEP Transmittal", r.week, r.transmittal)} class="progress-value progress-transmittal-value" x="${x(r.week)}" y="${y(r.transmittal) + 18}" text-anchor="middle">${r.transmittal > 0 ? fmt(r.transmittal) : ""}</text>`).join("")}</g>${rows.map((r) => `<text x="${x(r.week)}" y="${bottom + 28}" text-anchor="middle">${weekLabel(r.week).replace("CW", "")}</text>`).join('')}${renderWeeklyMonthRow(rows.map(r => ({ key: `2026-CW${String(r.week).padStart(2, "0")}` })), i => x(rows[i].week), bottom)}<text x="${canvasWidth / 2}" y="${bottom + 108}" text-anchor="middle">CW · 2026</text><text x="20" y="${60 + plotHeight / 2}" transform="rotate(-90 20 ${60 + plotHeight / 2})" text-anchor="middle">Cumulative family count</text></svg></div><details class="chart-source"><summary>Chart purpose and legend definitions · weekly values</summary><p>Click a legend to hide or show its line, points and numeric labels. This changes presentation only, not data, filters, forecast calculations or exports. This chart compares cumulative planned CFM with source-field CFM Families by calendar week (CW). The horizontal axis shows weeks and the vertical axis shows cumulative Family counts. Grey dashed Plan counts unique TIDP RFA Families at their earliest scheduled CFM (Confirm) week, including combined REV | CFM markers. Families without CFM are excluded. Scheduled CFM is not proof of completed confirmation. Blue Actual counts distinct linked Families by source Actual_CFM through the snapshot; missing, invalid or future Actual_CFM is excluded, with no fallback to End Date; the amber vertical line marks the reporting week. Green MEP Transmittal counts distinct linked Families by source Actual_TRM through the snapshot, excluding missing, invalid and future dates without fallback. Click a green point for its Family details. Brown dashed Forecast uses the ordinary least-squares slope of cumulative Actual CFM at ${fmt(weeklyRate)} Families per week, based on the last four complete weeks (${weekLabel(completedWeek - 3)}–${weekLabel(completedWeek)}). The projection is anchored at the current Actual CFM, not the fitted intercept. Brown numbers are estimates, capped at the final planned total of ${fmt(target)}. Click a nonzero Plan or Actual number for Family details; Forecast numbers have no detail action. The table shows weekly totals with future estimates labelled Forecast.</p>${weeklyExport}<div class="table-wrap"><table><thead><tr><th>CW</th><th>Cumulative plan</th><th>Actual / Forecast</th><th>MEP Transmittal</th></tr></thead><tbody>${rows.map((r) => `<tr><td>CW${r.week}</td><td>${fmt(r.count)}</td><td class="${r.actual == null ? "progress-forecast-value" : ""}">${r.actual == null ? `${forecastValue(r) == null ? "—" : fmt(forecastValue(r))} <span>(Forecast)</span>` : fmt(r.actual)}</td><td>${r.transmittal == null ? "—" : fmt(r.transmittal)}</td></tr>`).join('')}</tbody></table></div></details></div>`, "family-progress-panel");
 }
 
 function overviewView(scoped) {
@@ -369,8 +324,13 @@ function overviewView(scoped) {
   const matched = rfa.filter((item) => item.familyId);
   const critical = open.filter((item) => ticketAge(item, data.meta.asOf) > data.config.ticketAgingCriticalDays);
   const attention = managementAttention(data, deliverables, tickets, families, context);
-  const familyKeys = new Map(rfa.map((item) => [item.familyKey, Boolean(item.familyId)]).filter(([key]) => key));
-  const uploadedCount = [...familyKeys.values()].filter(Boolean).length;
+  const eligibleIds = new Set(uploadedFamilyRows(families,data.meta.asOf).map(f=>f.id));
+
+  const familyKeys = new Map(rfa.map((item) => [item.familyKey, eligibleIds.has(item.familyId)]).filter(([key]) => key));
+  const uploadedCount = eligibleIds.size;
+  const linkedUploadCount = [...familyKeys.values()].filter(Boolean).length;
+  const evidenceScoped = filtered().evidenceSelected;
+  const pendingLabel = evidenceScoped ? 'Not matched in selected evidence' : 'Not Yet Upload';
   const hours = ["Positive", "Negative"].map((label, index) => ({ label, value: tickets.filter((item) => hourClass(item) === label).reduce((sum, item) => sum + Number(item.actualHours || 0), 0), filter: "active", color: ["var(--green)", "var(--red)"][index] }));
   const ticketCounts = ["Positive", "Negative"].map((label, index) => ({ label, value: tickets.filter((item) => hourClass(item) === label).length, filter: "active", color: ["var(--green)", "var(--red)"][index] }));
   const positiveTickets = tickets.filter((item) => hourClass(item) === "Positive");
@@ -382,8 +342,9 @@ function overviewView(scoped) {
     .sort((a, b) => b[1] - a[1])
     .map(([label, value], index) => ({ label, value, filter: "reporter", color: workColors[index % workColors.length] }));
   return `${heading()}
+
     <div class="grid-2 overview-charts">
-      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: "Not Yet Upload", value: familyKeys.size - uploadedCount, color: "var(--amber)", filter: "upload" }], "families in TIDP", "This chart shows upload progress for the unique Families in the TIDP RFA scope. The center is the total number of Families. Green (Uploaded) shows Families linked to an upload in this project; amber (Not Yet Upload) shows Families without a linked upload at the reporting snapshot. Each percentage is its share of the total. Click a slice to view its Families, or select a legend item to filter the dashboard.", { disclosureTitle: "Chart purpose and legend definitions", showSourceContext: false })}
+      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: pendingLabel, value: Math.max(0, familyKeys.size - uploadedCount), color: "var(--amber)", filter: "upload" }], "families in TIDP", evidenceScoped ? 'The center retains the native planning baseline. Uploaded counts all project uploads in the selected evidence only. Amber means not matched in this evidence selection, not proof that the Family has never been uploaded. Clear evidence filters for full-snapshot coverage.' : `This chart compares the planned RFA total with all uploaded project Families. Linked TIDP coverage remains ${linkedUploadCount}/${familyKeys.size}; ${familyKeys.size - linkedUploadCount} planned names have no linked upload. The amber count is the arithmetic balance, not the unmatched-name list. This chart shows upload progress for the unique Families in the TIDP RFA scope. The center is the total number of Families. Green counts all project uploads; amber is planned total minus uploads. Each percentage is its share of the total. Click a slice to view its Families, or select a legend item to filter the dashboard.`, { disclosureTitle: "Chart purpose and legend definitions", showSourceContext: false })}
       ${piePanel("ticket-hours", "Annotation Project Ticket Hours", hours, "total hours", "This chart shows recorded annotation ticket hours. The center is total hours. Green represents Positive work (including Re-Assessment); red represents Negative work. Numbers are hours and percentages show each group's share of the total. Each ticket contributes its recorded hours once; tickets without recorded hours are excluded. Click a slice for its tickets, or a legend item to filter the dashboard.")}
     </div>
     ${piePanel("positive-work-type", "Positive Hours by Work Type", positiveByWork, "positive hours", "This chart shows Positive hours (including Re-Assessment) by work type. The center is total Positive hours. Each color is a work type; numbers are recorded hours and percentages are shares of the total. Each ticket contributes once to its primary work type. Click a slice for its tickets, or a legend item to filter the dashboard.")}
@@ -392,6 +353,18 @@ function overviewView(scoped) {
       ${piePanel("positive-reporters", "Positive Tickets by Reporter", positiveByReporter, "positive tickets", "This chart shows Positive tickets (including Re-Assessment), grouped by reporter. The center is the total Positive ticket count. Each color identifies a reporter, the person who reported the ticket. Numbers are ticket counts and percentages show each reporter's share of the total. Click a slice for ticket details, or a legend item to filter the dashboard.", { showSourceContext: false })}
     </div>
     ${familyProgressChart(deliverables, families)}`;
+}
+
+function qualityReview(families) {
+  const ids = new Set(families.map(f=>f.id));
+  const records = (data.qualityRecords || []).filter(r=>ids.has(r.familyId));
+  const groups = [...groupCount(records,r=>r.type)];
+  const controls = groups.map(([type,count])=>{
+    const rows=records.filter(r=>r.type===type).map(r=>({ ...r, leftSource:`${r.left.workbook} / ${r.left.sheet}!${r.left.cell}`, leftValue:r.left.value, rightSource:r.right ? `${r.right.workbook} / ${r.right.sheet}!${r.right.cell}` : null, rightValue:r.right?.value }));
+    pieDetails.set(`qa:${type}`,{title:type.replaceAll('_',' '),rows,columns:['familyKey','ticketId','leftSource','leftValue','rightSource','rightValue','resolution']});
+    return `<button class="button" data-issue-detail="qa:${type}">${escapeHtml(type.replaceAll('_',' '))}: ${count}</button>`;
+  }).join('');
+  return panel('Source review', '', `<div class="panel-body"><p>Ticket status prefers unambiguous directly-linked Family status (user decision 05/10/2026). Matrix status is preserved. Historical Unmatched entries do not remove current Families. CFM/TRM ordering requires cycle review; no dates are repaired.</p><div class="issue-legend">${controls || 'No review records in the selected evidence scope.'}</div></div>`, 'source-review');
 }
 
 function timeline(deliverables) {
@@ -599,7 +572,7 @@ function familyAnalysisView(scoped) {
       return piePanel("family-uploaders", "Uploaded Families by uploader", [...counts].sort((a, b) => b[1] - a[1]).map(([label, value], i) => ({ label, value, filter: "uploader", color: colors[i % colors.length] })), "uploaded families", "The center shows unique uploaded Families. Each slice shows an uploader's count and share of this total. Counts describe uploaded output, not individual efficiency or task complexity. Click a slice to view Family records; select a legend to filter related dashboard components.");
     })(),
     panel, heading, escapeHtml, fmt, fmtDate, uploadAxisStep: state.uploadAxisStep,
-    forecastTarget: new Set(scoped.deliverables.filter(r => r.familyKey && r.workType === "Revise the RFA library").map(r => r.familyKey)).size,
+    forecastPlan: scoped.deliverables,
     register: (id, meta) => pieDetails.set(id, meta) });
 }
 
@@ -693,15 +666,66 @@ function applyComponentLayout() {
   fitDonutLabels(root);
 }
 
+function pageMarkup() {
+  const scoped = filtered();
+  const renderers = { overview: overviewView, tidp: tidpView, tickets: ticketsView, families: familiesView, dependencies: dependenciesView, team: familyAnalysisView };
+  return (scoped.scopeNote ? `<p class="evidence-gap" role="status">${escapeHtml(scoped.scopeNote)}</p>` : '') + renderers[state.page](scoped);
+}
 function renderPage() {
   persistLayout();
   tableExports.clear();
-  const scoped = filtered();
-  const renderers = { overview: overviewView, tidp: tidpView, tickets: ticketsView, families: familiesView, dependencies: dependenciesView, team: familyAnalysisView };
-  document.querySelector("#page-content").innerHTML = renderers[state.page](scoped);
+  document.querySelector("#page-content").innerHTML = pageMarkup();
   applyComponentLayout();
   document.querySelectorAll("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === state.page));
 }
+
+function runtimeSnapshot() {
+  return { data, familyRoleHours, timeHistory, context, lookup, releaseId,
+    state: structuredClone(state), pies: [...pieDetails], tables: [...tableExports] };
+}
+function restoreRuntime(snapshot) {
+  ({ data, familyRoleHours, timeHistory, context, lookup, releaseId } = snapshot);
+  Object.assign(state, snapshot.state);
+  pieDetails.clear(); snapshot.pies.forEach(([k,v]) => pieDetails.set(k,v));
+  tableExports.clear(); snapshot.tables.forEach(([k,v]) => tableExports.set(k,v));
+}
+function prepareBundle(bundle) {
+  const previous = runtimeSnapshot();
+  try {
+    ({ data, familyRoleHours, timeHistory } = bundle);
+    context = buildContext(data);
+    lookup = createLookup();
+    releaseId = bundle.manifest.releaseId;
+    pieDetails.clear(); tableExports.clear();
+    const template = document.createElement('template');
+    template.innerHTML = appShell();
+    template.content.querySelector('#page-content').innerHTML = pageMarkup();
+    return { runtime: runtimeSnapshot(), fragment: template.content };
+  } finally { restoreRuntime(previous); }
+}
+function commitBundle(prepared) {
+  const root = document.querySelector('#app');
+  const previous = runtimeSnapshot();
+  const oldNodes = [...root.childNodes];
+  const oldClass = root.className;
+  try {
+    restoreRuntime(prepared.runtime);
+    root.className = '';
+    root.replaceChildren(prepared.fragment);
+    wireTopbar();
+    applyComponentLayout();
+    pieDetailSelection = null;
+  } catch (error) {
+    restoreRuntime(previous);
+    root.className = oldClass;
+    root.replaceChildren(...oldNodes);
+    throw error;
+  }
+}
+const refreshBundle = createRefreshController({
+  load: () => fetchPublishedData(fetch, import.meta.env.DEV ? `${import.meta.env.BASE_URL}data/` : undefined),
+  prepare: prepareBundle, commit: commitBundle,
+});
 
 function openPieDetails(id, filter, value, trigger) {
   pieDetailTrigger = trigger || pieDetailTrigger;
@@ -719,8 +743,20 @@ function openPieDetails(id, filter, value, trigger) {
   } else if (id === "family-outcomes" || id === "family-uploaders") {
     rows = uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => id === "family-outcomes" ? familyOutcome(r) === value : (r.uploader || "Unassigned") === value);
     columns = ["id", "name", "category", "uploader", "reworkOutcome", "ticketStatus", "end"];
+  } else if (id === "project-family-upload") {
+    const linked = new Set(scoped.deliverables.filter(r => r.workType === "Revise the RFA library").map(r => r.familyId).filter(Boolean));
+    rows = uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => linked.has(r.id) === (value === "Linked to TIDP"));
+    columns = ["id", "name", "category", "uploader", "end"];
   } else if (id === "family-upload") {
-    ({ rows, columns } = tidpUploadDetails(scoped.deliverables, lookup.familyById, value));
+    const uploaded = uploadedFamilyRows(scoped.families, data.meta.asOf);
+    if (value === "Uploaded") {
+      rows = uploaded;
+      columns = ["id", "name", "category", "uploader", "end"];
+    } else {
+      const plan = new Set(scoped.deliverables.filter(r => r.workType === "Revise the RFA library" && r.familyKey).map(r => r.familyKey)).size;
+      rows = [{ name: "Arithmetic balance, not an unmatched Family list", planned: plan, uploaded: uploaded.length, balance: Math.max(0, plan - uploaded.length) }];
+      columns = ["name", "planned", "uploaded", "balance"];
+    }
   } else {
     rows = scoped.tickets.filter((r) => (filter === "active" ? hourClass(r) : r[filter]) === value && (!id.startsWith("positive-") || hourClass(r) === "Positive"));
     columns = ["id", "summary", "active", "reporter", "handler", "status", "actualHours", "end"];
@@ -736,6 +772,7 @@ function renderPieDetails() {
   const rowMarkup = (r) => `<tr>${s.columns.map((key) => `<td>${escapeHtml(r[key] ?? "—")}</td>`).join("")}</tr>`;
   const labels = { id: "ID", title: "Family / deliverable", summary: "Ticket", active: "Classification", reporter: "Reporter", handler: "Handler", status: "Status", actualHours: "Hours", created: "Created date", end: "End date", system: "System", owner: "Owner", workType: "Work type", plannedStartWeek: "First planned CW", plannedFinishWeek: "Last planned CW" };
   Object.assign(labels, { name: "Family", category: "Category", uploader: "Uploader", reworkOutcome: "Outcome", ticketStatus: "Ticket status", ticketNumber: "Ticket number", ticketId: "Ticket ID", errorCount: "Error types count", errorTypes: "Error types" });
+  Object.assign(labels, { errorType: 'Error type', planned: 'Planned total', uploaded: 'Uploaded total', balance: 'Arithmetic balance', actualCfm: 'Actual_CFM date', actualTrm: 'Actual_TRM date', cfmKind: 'CFM evidence kind', cfmCell: 'CFM source cell', familyKey: 'Family key', leftSource:'Family source', leftValue:'Family value', rightSource:'Compared source', rightValue:'Compared value', resolution:'Review state' });
   document.querySelector("#drawer-root").innerHTML = `<div class="drawer-backdrop" data-close-drawer></div><aside class="drawer chart-detail-drawer" role="dialog" aria-modal="true" aria-labelledby="pie-detail-title"><button class="drawer-close" data-close-drawer aria-label="Close">×</button><h2 id="pie-detail-title">${escapeHtml(meta.title)} — ${escapeHtml(s.value)}</h2>${tableExportButton("detail", `${meta.title} - ${s.value}`, s.columns.map(key => ({ key, label: labels[key] || key })), () => selectTableRows(s))}<div class="table-wrap" tabindex="0" aria-label="Scrollable detail records"><table><thead><tr>${s.columns.map((key) => `<th aria-sort="${s.sort === key ? s.descending ? "descending" : "ascending" : "none"}"><button data-pie-sort="${key}">${labels[key]} ${s.sort === key ? s.descending ? "↓" : "↑" : "↕"}</button><input data-pie-search="${key}" aria-label="Search ${labels[key]} in details" value="${escapeHtml(s.searches[key] || "")}" /></th>`).join("")}</tr></thead><tbody>${rows.slice(0, 100).map(rowMarkup).join("") || `<tr><td colspan="${s.columns.length}" class="empty">No matching records.</td></tr>`}</tbody></table></div><div class="detail-count" role="status">${fmt(Math.min(100, rows.length))} / ${fmt(rows.length)} records</div></aside>`;
   const scroller = document.querySelector(".chart-detail-drawer .table-wrap");
   let shown = Math.min(100, rows.length);
@@ -804,21 +841,12 @@ async function updatePublishedData() {
   button.setAttribute('aria-busy', 'true');
   document.querySelector('[data-update-status]').textContent = 'Downloading latest published data…';
   try {
-    const next = await fetchPublishedData(fetch, import.meta.env.DEV ? `${import.meta.env.BASE_URL}data/` : undefined);
-    const nextContext = buildContext(next.data);
-    const unchanged = next.data.meta.generated === data.meta.generated;
-    data = next.data;
-    familyRoleHours = next.familyRoleHours;
-    timeHistory = next.timeHistory;
-    context = nextContext;
-    lookup = createLookup();
-    pieDetails.clear();
-    pieDetailSelection = null;
+    const previousRelease = releaseId;
+    const result = await refreshBundle();
+    const unchanged = result.releaseId === previousRelease;
     updateMessage = unchanged ? 'Already using the latest data.' : 'Data updated. Filters and view settings preserved.';
     updatingData = false;
-    document.querySelector('#app').innerHTML = appShell();
-    wireTopbar();
-    renderPage();
+    document.querySelector('[data-update-status]').textContent = updateMessage;
     document.querySelector('[data-update-data]').focus({ preventScroll: true });
   } catch (error) {
     updateMessage = `Update failed. Existing data retained. ${error.message}`;
@@ -877,11 +905,11 @@ function wireEvents() {
       const week = Number(progress.dataset.progressWeek);
       const series = progress.dataset.progressDetail;
       const cutoff = meta.weekEnd(week) < data.meta.asOf ? meta.weekEnd(week) : data.meta.asOf;
-      const dateField = series === "MEP Transmittal" ? "transmittal" : "end";
-      const rows = meta.rows.filter((r) => series === "Plan" ? r.plannedStartWeek && r.plannedStartWeek <= week : r[dateField] && r[dateField] <= cutoff).map(r => ({ ...r, end: r[dateField] }));
+      const dateField = series === "MEP Transmittal" ? "actualTrm" : "actualCfm";
+      const rows = meta.rows.filter((r) => series === "Plan" ? r.plannedStartWeek && r.plannedStartWeek <= week : r[dateField] && r[dateField] <= cutoff);
       if (!rows.length) return;
       pieDetailTrigger = progress;
-      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns: ["ticketId", "title", "system", "owner", "plannedStartWeek", "end"], page: 1, sort: "", descending: true, searches: {} };
+      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns: ["ticketId", "title", "system", "owner", "plannedStartWeek", dateField, 'cfmKind', 'cfmCell'], page: 1, sort: "", descending: true, searches: {} };
       renderPieDetails(); document.querySelector(".drawer-close")?.focus(); return;
     }
     const slice = event.target.closest("[data-pie-detail]");
@@ -995,24 +1023,9 @@ function wireTopbar() {
 
 async function start() {
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/dashboard-data.json`);
-    if (!response.ok) throw new Error(`Data request failed: ${response.status}`);
-    data = await response.json();
-    try {
-      const rolesResponse = await fetch(`${import.meta.env.BASE_URL}data/family-role-hours.json`);
-      if (rolesResponse.ok) familyRoleHours = await rolesResponse.json();
-    } catch { /* Role-series evidence gaps remain explicit. */ }
-    try {
-      const hoursResponse = await fetch(`${import.meta.env.BASE_URL}data/weekly-hours.json`);
-      if (hoursResponse.ok) timeHistory = await hoursResponse.json();
-    } catch { /* The independent time-history chart exposes its unavailable state. */ }
-    context = buildContext(data);
-    lookup = createLookup();
-    document.querySelector("#app").className = "";
-    document.querySelector("#app").innerHTML = appShell();
-    wireTopbar();
+    const bundle = await fetchPublishedData(fetch, `${import.meta.env.BASE_URL}data/`);
+    commitBundle(prepareBundle(bundle));
     wireEvents();
-    renderPage();
   } catch (error) {
     document.querySelector("#app").innerHTML = `<div class="loading-mark">!</div><h1>Dashboard could not start</h1><p>${escapeHtml(error.message)}</p><p>Run the project through the local development server or GitHub Pages.</p>`;
   }

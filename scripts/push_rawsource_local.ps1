@@ -1,91 +1,74 @@
-# Push files into PMP_Project_Report RawSource/ from a local clone (Windows PowerShell).
-# No Cursor cloud agent. Review before first use.
-#
-# Usage:
-#   .\push_rawsource_local.ps1 -DryRun -Files "C:\path\Family_Upload_vs_Annotation_Tickets_Checked.xlsx"
-#   .\push_rawsource_local.ps1 -Message "Family Checked: …" -Files "C:\path\Family_….xlsx"
-#
-# Defaults for HuyDam:
-#   Repo = D:\03_DCMvn\PMP Dashboard
-#   Branch = main
-#
-# Requirements: git on PATH; remote already authenticated. Never prints tokens.
-
+# Fail-closed offline candidate workflow. DryRun is read-only, including Git refs/index.
+# Publication requires BOTH -Execute and -Publish; never run on a dirty source clone.
 [CmdletBinding()]
 param(
-  [string]$Repo = $(if ($env:PMP_REPO) { $env:PMP_REPO } else { 'D:\03_DCMvn\PMP Dashboard' }),
-  [string]$Branch = $(if ($env:PMP_BRANCH) { $env:PMP_BRANCH } else { 'main' }),
-  [string]$Message = '',
+  [string]$Repo = 'D:\03_DCMvn\PMP Dashboard',
+  [string]$Branch = 'main',
+  [string]$Message = 'RawSource: validated offline bundle update',
   [switch]$DryRun,
-  [Parameter(Mandatory = $true)]
-  [string[]]$Files
+  [switch]$Execute,
+  [switch]$Publish,
+  [string]$Python = 'python',
+  [Parameter(Mandatory=$true)][string[]]$Files
 )
-
-$ErrorActionPreference = 'Stop'
-
-if (-not (Test-Path -LiteralPath (Join-Path $Repo '.git'))) {
-  throw "Not a git repo: $Repo (set -Repo or PMP_REPO)"
+$ErrorActionPreference='Stop'
+function InvokeRepoGit([string]$Path,[string[]]$Arguments) {
+  $result = & git -C $Path @Arguments
+  if ($LASTEXITCODE -ne 0) { throw "Git operation failed: $($Arguments[0])" }
+  return $result
 }
-$raw = Join-Path $Repo 'RawSource'
-if (-not (Test-Path -LiteralPath $raw)) {
-  throw "Missing RawSource under: $Repo"
+$repoPath=(Resolve-Path -LiteralPath $Repo).Path
+$base=(InvokeRepoGit $repoPath @('rev-parse','HEAD')).Trim()
+$current=(InvokeRepoGit $repoPath @('branch','--show-current')).Trim()
+if ($current -ne $Branch) { throw 'Branch mismatch; no checkout is performed.' }
+$allowed=@('Annotation_Ticket_User_Matrix_Checked.xlsx','DCMvn_TIDP_Combined_20260930.xlsx','Family_Upload_vs_Annotation_Tickets_Checked.xlsx')
+$inputs=@{}
+# Complete preflight before any candidate/copy. Supplemental equivalence changes require separate review.
+foreach ($file in $Files) {
+  if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing input: $file" }
+  $resolved=(Resolve-Path -LiteralPath $file).Path
+  $name=Split-Path -Leaf $resolved
+  if ($name -notin $allowed -or $inputs.ContainsKey($name)) { throw "Unsupported or duplicate input: $name" }
+  $inputs[$name]=$resolved
 }
-
-Write-Host "Repo:    $Repo"
-Write-Host "Branch:  $Branch"
-Write-Host "Dry-run: $DryRun"
-
-Push-Location -LiteralPath $Repo
+if ($DryRun -or -not $Execute) {
+  Write-Output "Read-only preflight complete. HEAD=$base; inputs=$($inputs.Count). No fetch, checkout, copy, stage, commit or push."
+  return
+}
+if ((InvokeRepoGit $repoPath @('status','--porcelain')).Count -gt 0) { throw 'Dirty source repository; preserve existing changes and use a clean candidate.' }
+$remote=(InvokeRepoGit $repoPath @('remote','get-url','origin')).Trim()
+$remoteLine=InvokeRepoGit $repoPath @('ls-remote','--heads','origin',$Branch)
+if (-not $remoteLine -or ($remoteLine -split '\s+')[0] -ne $base) { throw 'Remote advanced or mismatched; stopped without changing local branch.' }
+$candidate=Join-Path ([IO.Path]::GetTempPath()) ('pmp-candidate-'+[Guid]::NewGuid().ToString('N'))
+InvokeRepoGit $repoPath @('clone','--no-hardlinks','--single-branch','--branch',$Branch,$repoPath,$candidate) | Out-Null
+# Candidate is intentionally retained on failure for inspection; original index/checkout remain untouched.
+foreach ($name in $inputs.Keys) { Copy-Item -LiteralPath $inputs[$name] -Destination (Join-Path $candidate "RawSource/$name") -Force }
+Push-Location -LiteralPath $candidate
 try {
-  git fetch origin $Branch
-  if ($LASTEXITCODE -ne 0) { throw "git fetch failed" }
-  git checkout $Branch
-  if ($LASTEXITCODE -ne 0) { throw "git checkout failed" }
-  git pull --ff-only origin $Branch
-  if ($LASTEXITCODE -ne 0) { throw "git pull --ff-only failed" }
-
-  $copied = @()
-  foreach ($src in $Files) {
-    if (-not (Test-Path -LiteralPath $src -PathType Leaf)) {
-      throw "Not a file: $src"
-    }
-    $base = Split-Path -Leaf $src
-    $dest = Join-Path $raw $base
-    $len = (Get-Item -LiteralPath $src).Length
-    Write-Host "Copy: $src -> RawSource\$base ($len bytes)"
-    if (-not $DryRun) {
-      Copy-Item -LiteralPath $src -Destination $dest -Force
-    }
-    $copied += "RawSource/$base"
+  & $Python scripts/build_dashboard_data.py
+  if ($LASTEXITCODE -ne 0) { throw 'Offline source build failed.' }
+  & $Python -m unittest discover -s tests -p 'test_*.py'
+  if ($LASTEXITCODE -ne 0) { throw 'Source tests failed.' }
+  & npm ci
+  if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed.' }
+  foreach ($gate in @('lint','test','build')) {
+    & npm run $gate
+    if ($LASTEXITCODE -ne 0) { throw "Validation failed: $gate" }
   }
-
-  if ($DryRun) {
-    Write-Host 'Dry-run only — no commit/push.'
-    git status --short -- @copied
-    return
-  }
-
-  git add -- @copied
-  if ($LASTEXITCODE -ne 0) { throw "git add failed" }
-
-  git diff --cached --quiet
-  if ($LASTEXITCODE -eq 0) {
-    Write-Host 'No changes to commit (files identical).'
-    return
-  }
-
-  if ([string]::IsNullOrWhiteSpace($Message)) {
-    $Message = "RawSource: update $($copied -join ' ') ($(Get-Date -Format yyyy-MM-dd))"
-  }
-
-  git commit -m $Message
-  if ($LASTEXITCODE -ne 0) { throw "git commit failed" }
-  git push origin $Branch
-  if ($LASTEXITCODE -ne 0) { throw "git push failed" }
-  $sha = (git rev-parse --short HEAD).Trim()
-  Write-Host "Pushed: $sha on $Branch"
-  git log -1 --oneline
-}
-finally {
-  Pop-Location
-}
+  & node scripts/validate_bundle.mjs
+  if ($LASTEXITCODE -ne 0) { throw 'Bundle validation failed.' }
+  if (-not $Publish) { Write-Output "Validated candidate retained: $candidate. No commit/push."; return }
+  $paths=@($inputs.Keys | ForEach-Object { "RawSource/$_" })+@('public/data/dashboard-data.json','public/data/family-role-hours.json','public/data/weekly-hours.json','public/data/bundle-manifest.json')
+  $changed=InvokeRepoGit $candidate @('diff','--name-only')
+  foreach ($path in $changed) { if ($path -notin $paths) { throw "Unexpected generated change: $path" } }
+  InvokeRepoGit $candidate (@('add','--')+$paths) | Out-Null
+  $staged=InvokeRepoGit $candidate @('diff','--cached','--name-only')
+  if (-not $staged) { Write-Output 'No changes; no commit/push.'; return }
+  foreach ($path in $staged) { if ($path -notin $paths) { throw 'Unexpected staged path.' } }
+  $latest=InvokeRepoGit $repoPath @('ls-remote','--heads','origin',$Branch)
+  if (($latest -split '\s+')[0] -ne $base) { throw 'Remote advanced; stopped before commit/push.' }
+  InvokeRepoGit $candidate @('commit','-m',$Message) | Out-Null
+  # Normal non-force push also rejects a race after the final remote check.
+  InvokeRepoGit $candidate @('push',$remote,"HEAD:refs/heads/$Branch") | Out-Null
+  Write-Output "Published validated candidate: $candidate"
+} finally { Pop-Location }

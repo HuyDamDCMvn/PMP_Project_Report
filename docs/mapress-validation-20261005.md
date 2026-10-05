@@ -2,7 +2,7 @@
 
 Baseline: 67b61f61dc1493a8cfda5ae1e7caa144df4235a5. User approved excluding the 72176 alias and subsequently authorized all established source/metadata corrections. No replacement carbon-steel equivalence is inferred.
 
-Changes: Family Mapress Weigh Score Sum 4 → 2; source note now one ticket / weight 2. Family Meta Families 2043 → 2044 and Multi_remaining 1 → 0. Equivalence Summary now reflects its actual 2001 applied rows and Decision counts (the removed row was proposed). Historical sheets and original Generated timestamps preserved.
+Changes: Family Mapress Weigh Score Sum 4 → 2; source note now one ticket / weight 2. Actual primary population is 2044 full rows / 2002 project rows. Family Meta!B15=2043 and Meta!B31=1 are retained historical metadata, not updated population claims. Equivalence Summary reflects its actual 2001 applied rows and Decision counts (the removed row was proposed). Historical sheets and original Generated timestamps are preserved.
 
 Final equivalence Git blob: 0b9ca178dc18a838e9d54613001269c0e4797658. Approval date and policy in JSON describe 2026-10-05 scope; proposed/temporary source decisions remain unchanged. This authorization is not independent physical-model verification.
 

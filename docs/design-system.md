@@ -1,5 +1,11 @@
 # Design system
 
+CFM Forecast now uses the regression slope of four complete cumulative weeks, anchored to the current Actual CFM and capped at Plan. Summary and chart disclosure name the method and window; marks retain rounded estimated labels and noninteractive forecast semantics. Other series, sizing and filters remain unchanged.
+
+Latest user override: remove the separate Uploaded Families chart and Source review panel. TIDP Family Upload now compares all-project uploads (2,002) with the planned total (2,295), displaying an arithmetic remainder (293), not unmatched-name coverage. Linked coverage remains 2,001/2,295 in chart notes. CFM legend reads Actual CFM; the prominent provenance banner is removed, with source lineage retained in detail/docs. Weekly linked issues uses Total issues as the sum of all nine error-flag series; its detail contains one row per Family/error flag.
+
+Executive Overview begins with an Uploaded Families panel using the same all-project upload cohort as Productivity. Its center is total uploaded Families; linked/unlinked TIDP slices open Family evidence without applying a new filter. The existing TIDP Family Upload panel remains a separate planning-coverage measure. Both panels reuse the shared collapsible/resizable donut component; no new visual tokens are introduced.
+
 Project Goals uses a subtle white-to-Blue-soft gradient (--goals-surface), 16px corners (--goals-radius), Blue left accent and shared raised shadow. Each goal has a 32px circular navy/blue numbered badge (--goals-badge-size), with sparse dividers and comfortable spacing. Responsive 20–26px title and 14–17px body remain readable. The native disclosure retains a circular plus/minus cue and reflows below the MIDP title on narrow screens; source wording is unchanged. Decorative styling is static, without shimmer or distracting motion.
 
 MIDP heading includes an initially expanded native Project Goals disclosure with the five user-supplied goals, wrapping below the title on narrow viewports. Sidebar copy reads Snapshot recorded at 16:00 on dd.mm.yyyy; this user-supplied capture time does not change calculation cutoffs or claim exact API reconstruction. Generated timestamp stays in dataset metadata.

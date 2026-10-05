@@ -4,6 +4,7 @@ export const legendDefinitions = {
   Returned: 'Family with source Rework_Outcome = Returned; returned for rework.',
   Uploaded: 'Family in the TIDP scope linked to a project upload.',
   'Not Yet Upload': 'Family in the TIDP scope without a linked upload at the snapshot; this does not prove the Family does not exist.',
+  'Not matched in selected evidence': 'Retained plan key without a linked upload in the currently selected evidence; not proof of absolute absence or no previous upload.',
   Positive: 'Ticket classified as Positive, including Re-Assessment under the project rule.',
   Negative: 'Ticket with source Active = Negative.',
   'Uploaded Families': 'Distinct Families uploaded each week by End Date, including One pass and Returned.',

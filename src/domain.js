@@ -78,12 +78,22 @@ export function buildContext(data) {
   return { reportingWeek: data.meta.reportingWeek, openTicketIdsByFamily };
 }
 
+export function linearRegressionSlope(points) {
+  if (points.length < 2 || points.some(p => !Number.isFinite(p.week) || !Number.isFinite(p.value))) return null;
+  const x = points.reduce((s,p) => s + p.week, 0) / points.length;
+  const y = points.reduce((s,p) => s + p.value, 0) / points.length;
+  const variance = points.reduce((s,p) => s + (p.week - x) ** 2, 0);
+  return variance ? points.reduce((s,p) => s + (p.week - x) * (p.value - y), 0) / variance : null;
+}
+
 export function forecastCatchUp(actual, target, weeklyRate, reportingWeek) {
-  if (actual >= target) return { week: reportingWeek, points: [] };
-  if (!(weeklyRate > 0)) return { week: null, points: [] };
+  if (!Number.isFinite(target) || target <= 0) return { state: 'no_applicable_plan', week: null, points: [] };
+  if (!Number.isFinite(actual)) return { state: 'actual_unavailable', week: null, points: [] };
+  if (actual >= target) return { state: 'reached', week: reportingWeek, points: [] };
+  if (!Number.isFinite(weeklyRate) || !(weeklyRate > 0)) return { state: 'rate_unavailable', week: null, points: [] };
   const week = reportingWeek + Math.ceil((target - actual) / weeklyRate);
   const end = Math.min(week, reportingWeek + 52);
-  return { week, points: Array.from({ length: end - reportingWeek + 1 }, (_, i) => ({
+  return { state: 'forecast', week, points: Array.from({ length: end - reportingWeek + 1 }, (_, i) => ({
     week: reportingWeek + i, value: Math.min(target, actual + i * weeklyRate),
   })) };
 }

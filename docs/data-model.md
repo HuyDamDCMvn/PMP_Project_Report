@@ -1,5 +1,7 @@
 # Data analysis and relationship model
 
+Current population and cohort/status contracts are in `kpi-definition.md` (Current contract). The primary Family sheet has 2044 full records / 2002 project records; any 2043 figure below is historical. Current joins keep native planning rows, including unmatched rows, separate from selected ticket/Family evidence. Derived ticket status prefers unambiguous Family status while retaining Matrix originals. Bundle schema, lineage and QA are documented in `data-bundle-contract.md`.
+
 System × error heatmap counts the same Returned Family X flags as the donut. System is derived only from approved Family-to-TIDP links: a single distinct System is used; none means Unknown system; more than one means Multiple systems. These buckets count each Family/error once, preserving the donut total. errorSystem filtering propagates via direct Family ticket IDs and approved linked TIDP rows; it is separate from the existing planning System filter. Computation and rendering live in rework-heatmap.js; authoritative source files are unchanged.
 
 Family records retain reworkErrors from the nine X-marked error columns in authoritative Family_vs_Tickets. Only project-filtered uploaded Returned Families enter the error donut; each marked column counts once per Family. Source flags do not identify individual erroneous tickets in multi-ticket Families. The disclosure therefore reports unique linked tickets separately from error-flag totals without claiming a per-ticket classification.

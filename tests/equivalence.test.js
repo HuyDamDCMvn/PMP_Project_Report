@@ -42,9 +42,10 @@ test("snapshot reconciles donut, detail, weekly MIDP, cumulative uploads and coh
     assert.equal(midpWeeklyActual(group, scoped, data.meta.asOf).length, ids.size);
     assert.equal(linkedUploadDates(group.records, scoped, data.meta.asOf).size, ids.size);
   }
-  const cohort = familyProductivity(data.families, data.tickets, data.meta.asOf, { startWeek: 20, target: 2295 });
+  const cohort = familyProductivity(data.families, data.tickets, data.meta.asOf, { startWeek: 20, planRows: rfa });
   assert.equal(cohort.weeklyRate, 143.25);
-  assert.deepEqual(cohort.forecastWeeks, [{ week: 41, value: 143.25 }, { week: 42, value: 143.25 }, { week: 43, value: 6.5 }]);
+  assert.deepEqual(cohort.forecastWeeks, [{ week: 41, value: 143.25 }, { week: 42, value: 143.25 }, { week: 43, value: 7.5 }]);
+  assert.equal(cohort.tidpUploadScenario.actual,2001);
   assert.equal(cohort.weeks[0].key, "2026-CW20");
   assert.equal(cohort.weeks.length, 21);
   assert.equal(cohort.weeks[0].uploaded.length, 0);

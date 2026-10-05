@@ -1,5 +1,36 @@
 # KPI dictionary
 
+## Current contract — repair candidate, 2026-10-05
+
+CFM Forecast latest approved method: ordinary least-squares slope on four cumulative Actual_CFM points at the last four complete ISO weeks, excluding the partial reporting week. Anchor projection at the current reporting-week actual; cap at final CFM Plan. CW36–39 values 1418,1591,1792,1920 yield 170.70 Families/week; CW40 anchor 2000 gives CW41 2170.70 and capped CW42 2295. Nonpositive/unavailable slopes produce an unavailable forecast, never a negative projection. Other upload forecasts remain unchanged.
+
+Latest approved presentation override: the Overview upload donut displays 2,295 = 2,002 all-project uploads + 293 arithmetic remainder. This is not a matched-coverage composition; the distinct linked coverage remains 2,001/2,295 with 294 unmatched planned keys. Separate all-upload chart is removed. Total issues means the weekly sum of nine source error flags among eligible Returned Families, not unique Families or tickets. One Family/error flag is one detail row. CFM source lineage remains unchanged despite simplified labels and removal of the main-page review/banner.
+
+This section alone defines current behavior. Sections below `Historical notes` are retained audit history, not alternative calculation rules.
+
+| Measure | Current definition and snapshot baseline |
+| --- | --- |
+| Planning scope | Native TIDP System, direct Owner, Work Type and plan search. Reporter, Handler, outcomes and other evidence-only filters retain the full applicable Plan; actual/evidence scope is visibly disclosed. Handler is never interpreted as Plan Owner. |
+| RFA upload coverage | Distinct normalized RFA plan keys, with approved pinned equivalence links and valid project Family End Date through snapshot. 2,295 = 2,001 linked uploads + 294 without linked upload. Hanh RFA: 413 rows, 411 keys, 406 linked, 5 unlinked. Hanh across all work types has 483 rows; these units are not interchangeable. |
+| All uploaded Families | Project-filtered valid End Date uploads, including outside TIDP: 2,002 = 1,500 One pass + 501 Returned + 1 Unclassified. Outcomes come from Rework_Outcome, never ticket status. |
+| Executive / Productivity uploaded headline | User-approved shared all-project upload population: both use uploadedFamilyRows on the same filtered Family cohort. Overview shows 2,002 = 2,001 linked to TIDP + 1 not linked. Separate TIDP coverage remains 2,001 / 2,295 with 294 unmatched planned keys; no synthetic link is added. |
+| Cumulative CFM Plan | Distinct RFA keys at earliest scheduled CFM, including combined REV/CFM markers. Scheduled CFM is not observed confirmation. |
+| Actual CFM | Distinct linked Family Actual_CFM dates; no End Date fallback. CW40: 2,000. Labelled provisional source-field evidence, not verified approval. Seven upload-created proxies retain exact source lineage, six within snapshot; approval meaning and cycle history remain unresolved. |
+| MEP Transmittal | Distinct linked Family Actual_TRM dates, no fallback; CW40: 2,001. Detail/CSV uses Actual_TRM rather than End Date. |
+| CFM forecast | Four complete CWs, exclude partial CW40: increments 97,173,201,128; rate 149.75/week; target 2,295, actual 2,000, catch-up CW42. Forecast is an estimate, not a schedule or approval. |
+| TIDP upload forecast | Separate upload scenario: target 2,295, linked End Date actual 2,001, complete-CW rate 143.25/week. CW41–43 increments 143.25,143.25,7.5. Weekly observed throughput still counts all 2,002 uploads. |
+| Empty forecast | No positive applicable target = no_applicable_plan; missing actual = actual_unavailable; positive reached target = reached; absent positive rate = rate_unavailable. Zero target never implies completion. |
+| Ticket status | User decision: prefer one unambiguous directly-linked Family Ticket_Status. Preserve original matrixStatus and familyStatuses, with statusSource. Ten assigned→resolved disagreements remain in typed QA with both source cells. No completion date is invented. Multi-ticket/ambiguous status falls back to Matrix. |
+| Ticket hours | Preserve Matrix hours/classifications; quarter-hour floor per ticket, including Re-Assessment as Positive. Raw 40,233.51 → 40,233.50 total; combined Positive 38,021.76 → 38,021.75. Fifty-five missing values remain unknown. |
+| Average Family effort | All three series share weekly unique upload denominator. Chart-specific nearest-quarter half-up on source ticket and API person hours. CW21: 9 Families; total 113.50/9, MEP 98.25/9, DC 15.25/9. Missing history is unavailable, not zero. |
+| Weekly spent hours | Approved API supplement for Matrix Positive/Re-Assessment, work-date ticket-week signed nets floored to 0.25 h; never overwrite Matrix totals. No API generator is invoked by data:build. |
+| Source population/QA | Family_vs_Tickets project scope remains primary. Seventeen historical Unmatched overlaps do not remove Families; 44 CFM-before-TRM records are cycle-review warnings, not automatic date fixes. Meta counts/timestamps remain historical. |
+| Snapshot | Dates use calendar-day eligibility through 2026-09-30, not independently reconstructed exact 16:00 events. |
+
+Refresh/startup requires all three JSON datasets and a coherent versioned SHA-256 manifest. Byte integrity, schema, IDs, references, dates and source hashes are checked before detached rendering and an atomic commit. Failure restores prior runtime/DOM; later requests supersede older pending ones. See `data-bundle-contract.md`.
+
+## Historical notes — not current calculation rules
+
 ## Weekly linked issues by error type (05/10/2026)
 
 Latest interaction: chart legends toggle presentation-only line visibility, not reworkError cross-filters. Counts and weekly evidence remain unchanged; the donut/heatmap retain their separate shared filters. Axis step changes spacing only. Hidden-series state is independent from Reset Filters.

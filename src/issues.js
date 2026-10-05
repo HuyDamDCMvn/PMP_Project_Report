@@ -3,7 +3,7 @@ import { agingBucket, isOpenTicket, ticketAge } from "./domain.js";
 export const PERSON_NAMES = {
   "hu.dam": "Huy Dam", "lk.dang": "Long Dang", "nd.huynh": "Nhan Huynh",
   "kd.doan": "Khoa Doan", "qn.ha": "Quy Ha", "ht.nguyen": "Hung Nguyen",
-  "qn.nguyen": "Quan Nguyen", "dahn.nguyen": "Danh Nguyen", "f.imbrogno": "Frankie Imbrogno",
+  "qd.nguyen": "Quan Nguyen", "dahn.nguyen": "Danh Nguyen", "f.imbrogno": "Frankie Imbrogno",
   "l.truong": "Lam Truong", "tv.huynh": "Thuong Huynh", "n.le": "Nhut Le",
   "s.duong": "Sang Duong", "h.pham": "Hanh Pham",
 };
