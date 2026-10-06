@@ -1,4 +1,4 @@
-# Repair candidate — 05 October 2026
+# Historical repair candidate — 05 October 2026
 
 Local, uncommitted candidate on `codex/repair-dashboard-bff2eeb`, based on `bff2eebf808a034cb9770759574b0808141c43e8`. No push or publication performed for this repair. No authoritative workbook modified. Implementation follows the project UI/UX skill and source-backed data validation; source workbooks were inspected read-only.
 

@@ -49,3 +49,33 @@ test('failed staging and late older requests cannot overwrite committed state',a
   pending[0]({manifest:{releaseId:'older'}});assert.equal((await a).stale,true);assert.equal(committed,'new');
   const c=refresh();pending[2]({fail:true});await assert.rejects(c,/staging failed/);assert.equal(committed,'new');
 });
+
+const semanticMutations = [
+    b=>delete b.data.deliverables.find(p=>p.familyKey).familyKey,
+    b=>b.data.deliverables.find(p=>p.familyKey).familyKey=' ',
+    b=>b.data.deliverables.find(p=>p.familyKey).familyKey=42,
+    b=>b.data.deliverables.find(p=>!p.familyKey).familyKey='unexpected',
+    b=>b.data.meta.reportingWeek=1,
+    b=>b.data.tickets.find(t=>t.familyIds.length).familyIds=[],
+    b=>b.data.families[0].ticketIds=[],
+    b=>b.data.families[0].ticketIds.push(b.data.families[0].ticketIds[0]),
+    b=>b.data.tickets[0].id=String(b.data.tickets[0].id)
+];
+test('semantic validation rejects keys, snapshot inconsistency and nonreciprocal edges',()=>{
+  for(const mutate of semanticMutations) { const b=fixture();mutate(b);assert.throws(()=>validateBundle(b),/Invalid bundle/); }
+});
+test('semantic mutants pass checksum then reject before prepare/commit',async()=>{
+  const {sha256}=await import('../src/data-update.js');
+  for (const mutate of semanticMutations) {
+    const b=fixture();mutate(b);
+    const mutant=new TextEncoder().encode(JSON.stringify(b.data));
+    const desc=b.manifest.files.find(f=>f.name===names[1]);desc.bytes=mutant.length;desc.sha256=await sha256(mutant);
+    const manifestBytes=new TextEncoder().encode(JSON.stringify(b.manifest));
+    let prepared=false,committed=false;
+    const refresh=createRefreshController({load:()=>fetchPublishedData(async url=>({ok:true,arrayBuffer:async()=>{
+      const name=url.split('/').at(-1).split('?')[0];
+      return name===names[0]?manifestBytes:name===names[1]?mutant:bytes[name];
+    }})),prepare:()=>{prepared=true},commit:()=>{committed=true}});
+    await assert.rejects(refresh(),/Invalid bundle/);assert.equal(prepared,false);assert.equal(committed,false);
+  }
+});

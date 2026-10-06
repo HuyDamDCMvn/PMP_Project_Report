@@ -242,3 +242,7 @@ Weekly linked issues legend uses five columns (two rows for ten series) on wide 
 Returned-error donut legend uses four columns at container widths >=950px (two balanced rows for eight types), two columns below that and one below 450px. Count and percentage align together on the right of each item.
 Weekly Family uploads: numbered accessible context markers at CW30 (Miramas reassignment) and CW36 (Munich RE / EKB returning work), with visible notes below the chart. User-supplied context does not change measured counts.
 Upload context annotations use English text, 14-unit radius pale green markers (#dcfce7), dark green text (#14532d), and 15-unit bold numbers.
+
+## Arithmetic donut interaction — 6 October 2026
+
+Legend actions explicitly distinguish detail-only, filter and disabled presentation. The arithmetic remainder opens a one-record summary, has no aria-pressed state, and does not create a cross-filter. SVG and legend detail actions share the drawer handler; native buttons retain native Enter/Space activation. Escape restores trigger focus. Uploaded remains a real filterable cohort.

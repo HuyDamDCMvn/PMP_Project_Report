@@ -59,7 +59,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Bundle validation failed.' }
   if (-not $Publish) { Write-Output "Validated candidate retained: $candidate. No commit/push."; return }
   $paths=@($inputs.Keys | ForEach-Object { "RawSource/$_" })+@('public/data/dashboard-data.json','public/data/family-role-hours.json','public/data/weekly-hours.json','public/data/bundle-manifest.json')
-  $changed=InvokeRepoGit $candidate @('diff','--name-only')
+  $changed=@(InvokeRepoGit $candidate @('status','--porcelain','--untracked-files=all') | ForEach-Object { $_.Substring(3) })
   foreach ($path in $changed) { if ($path -notin $paths) { throw "Unexpected generated change: $path" } }
   InvokeRepoGit $candidate (@('add','--')+$paths) | Out-Null
   $staged=InvokeRepoGit $candidate @('diff','--cached','--name-only')
@@ -67,6 +67,10 @@ try {
   foreach ($path in $staged) { if ($path -notin $paths) { throw 'Unexpected staged path.' } }
   $latest=InvokeRepoGit $repoPath @('ls-remote','--heads','origin',$Branch)
   if (($latest -split '\s+')[0] -ne $base) { throw 'Remote advanced; stopped before commit/push.' }
+  foreach ($identity in @('user.name','user.email')) {
+    $value=(InvokeRepoGit $repoPath @('config',$identity)).Trim()
+    InvokeRepoGit $candidate @('config',$identity,$value) | Out-Null
+  }
   InvokeRepoGit $candidate @('commit','-m',$Message) | Out-Null
   # Normal non-force push also rejects a race after the final remote check.
   InvokeRepoGit $candidate @('push',$remote,"HEAD:refs/heads/$Branch") | Out-Null

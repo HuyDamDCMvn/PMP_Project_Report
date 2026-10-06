@@ -22,7 +22,7 @@ test("render/export selection composes searches, sorts numerically, retains blan
   assert.deepEqual(rows.map(r => r.id), [2, 10, 3, null]);
 });
 
-test("Uploaded export includes all 2001 records and ticket-number column, not just the first 100", () => {
+test("Linked-coverage export includes all 2001 records and ticket-number column, not just the first 100", () => {
   const data = JSON.parse(readFileSync(new URL("../public/data/dashboard-data.json", import.meta.url)));
   const detail = tidpUploadDetails(data.deliverables, new Map(data.families.map(f => [f.id, f])), "Uploaded");
   const rows = selectTableRows({ ...detail, sort: "id", descending: true });

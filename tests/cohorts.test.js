@@ -32,3 +32,17 @@ test('snapshot planning baseline survives Owner/workType and evidence filters', 
   assert.equal(new Set(rfa.deliverables.map(r=>r.familyKey)).size,2295);
   assert.equal(selectCohorts(data,{reporter:'bn.hoai'}).deliverables.length,2512);
 });
+
+test('Work Type-only retains unlinked native tickets and their hours',()=> {
+  const data=JSON.parse(readFileSync(new URL('../public/data/dashboard-data.json',import.meta.url)));
+  const scoped=selectCohorts(data,{workType:'Revise the RFA library'});
+  assert.equal(scoped.tickets.length,2435);
+  assert.ok(scoped.tickets.some(t=>t.id===75949));
+  assert.equal(scoped.tickets.reduce((s,t)=>s+(t.actualHours||0),0),20644.25);
+  const positive=selectCohorts(data,{workType:'Revise the RFA library',active:'Positive'});
+  assert.equal(positive.tickets.length,2304);
+  assert.equal(positive.tickets.reduce((s,t)=>s+(t.actualHours||0),0),18578.5);
+  const copy=structuredClone(fixture);copy.tickets.push({id:103,workType:'Revise the RFA library',familyIds:[]});
+  assert.deepEqual(selectCohorts(copy,{workType:'Revise the RFA library'}).tickets.map(t=>t.id),[101,102,103]);
+  assert.deepEqual(selectCohorts(copy,{owner:'Hanh Pham'}).tickets.map(t=>t.id),[101]);
+});

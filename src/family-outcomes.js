@@ -52,7 +52,7 @@ export function familyProductivity(families, tickets, asOf, { startWeek, planRow
     onePassRate: cohort.families.length ? onePass.length / cohort.families.length : null };
 }
 
-// Preserve the Overview population; ticket numbers are evidence, not additional rows.
+// Linked TIDP coverage only; active Overview uses uploadDetails for all project uploads.
 export function tidpUploadDetails(deliverables, familyById, value, selectedFamilyIds) {
   const uploaded = value === "Uploaded";
   const rows = [...new Map(deliverables.filter(r => r.familyKey && r.workType === "Revise the RFA library").map(r => [r.familyKey, r])).values()]

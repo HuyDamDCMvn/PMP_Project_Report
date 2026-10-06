@@ -43,3 +43,7 @@ Consolidated from the project conversation through 6 October 2026. These rules a
 ## Unresolved evidence, not silently approved
 
 Seven Actual_CFM values have upload-created proxy lineage (six within snapshot, one future). Their business acceptance remains unresolved; retain provisional metadata rather than asserting verified approval. Existing supplement event provenance/archive gaps and incomplete manual acceptance checks remain documented in the repair handoff. Publication authorization is not a resolution of those source questions.
+
+## Local repair follow-up
+
+Work Type-only ticket filtering uses Matrix Work Type directly, including tickets without uploaded Family links. System/Owner relationship requirements are unchanged. Arithmetic upload balance is detail-only and does not create a cohort filter. Semantic bundle validation rejects incompatible snapshot week/ISO year and nonreciprocal edges. See repair-verification-20261006.md for executed versus pending gates; no workbook policy changed.

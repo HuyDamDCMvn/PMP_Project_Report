@@ -13,7 +13,7 @@ test("all upload timelines follow familyId aliases, preserve identity, filters a
   assert.equal(families[0].key, "upload");
 });
 
-test("snapshot reconciles donut, detail, weekly MIDP, cumulative uploads and cohort after temporary mapping", () => {
+test("snapshot reconciles linked-upload scenario, detail, weekly MIDP, cumulative uploads and cohort after temporary mapping", () => {
   const data = JSON.parse(readFileSync(new URL("../public/data/dashboard-data.json", import.meta.url)));
   const rfa = data.deliverables.filter(r => r.workType === "Revise the RFA library");
   const unique = new Map(rfa.map(r => [r.familyKey, r]));

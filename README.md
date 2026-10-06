@@ -77,7 +77,7 @@ npm run preview
 
 The production output is written to `dist/`. The workflow validates every `main` push and stores a `production-dashboard` artifact. GitHub Pages uses the repository path `/PMP_Project_Report/` when Pages is available and the repository variable `ENABLE_GITHUB_PAGES=true` is set.
 
-The current repository is private and its GitHub plan did not support Pages at the 2 October 2026 validation. Do not make the repository public only to bypass that restriction without an explicit access decision. After Pages support is enabled for the private repository, create the repository variable and rerun the workflow.
+Historical note: Pages was unavailable during the 2 October validation. Publication was subsequently verified at https://huydamdcmvn.github.io/PMP_Project_Report/. Deployment remains conditional on ENABLE_GITHUB_PAGES; access settings must not be changed implicitly.
 
 ## Data refresh
 

@@ -37,6 +37,14 @@ jobs:
         with:
           name: production-dashboard
           path: dist
+  windows-helper:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -p "test_push_helper.py" -v
   deploy:
     if: ${{ vars.ENABLE_GITHUB_PAGES == 'true' }}
     permissions:
@@ -46,7 +54,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, windows-helper]
     steps:
       - uses: actions/download-artifact@v4
         with:

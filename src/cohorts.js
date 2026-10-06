@@ -13,6 +13,7 @@ export function selectCohorts(data, f = {}, timeHistory) {
     (!f.workType || r.workType === f.workType) &&
     (!term || `${r.id} ${r.title} ${r.system} ${r.owner}`.toLowerCase().includes(term)));
   const nativePlan = Boolean(f.system || planOwner || f.workType);
+  const ticketRelationshipRequired = Boolean(f.system || planOwner);
   const planIds = new Set(deliverables.map(r=>r.familyId).filter(Boolean));
   const systems = familyErrorSystems(data.deliverables);
   const errorIds = f.returnedErrorCount ? new Set(returnedTicketErrors(uploadedFamilyRows(data.families,data.meta.asOf),data.tickets).filter(t=>t.returnedErrorCount===f.returnedErrorCount).map(t=>t.id)) : null;
@@ -31,7 +32,7 @@ export function selectCohorts(data, f = {}, timeHistory) {
     (!f.handler || samePerson(r.handler,f.handler)) && (!f.reporter || (r.reporter||'Unknown reporter')===f.reporter) &&
     (!f.active || (['Positive','Re-Assessment'].includes(r.active)?'Positive':r.active)===f.active) &&
     (!f.status || r.status===f.status) && (!f.workType || r.workType===f.workType) &&
-    (!nativePlan || familyIds.has(r.id) || (r.workType!=='Revise the RFA library' && deliverables.some(p=>p.workType===r.workType && p.system===ticketSystem(r.summary)))) &&
+    (!ticketRelationshipRequired || familyIds.has(r.id) || (r.workType!=='Revise the RFA library' && deliverables.some(p=>p.workType===r.workType && p.system===ticketSystem(r.summary)))) &&
     (!familyFilter || familyIds.has(r.id)) &&
     (!f.spentWeek || (timeHistory?.entries||[]).some(e=>e.ticketId===r.id && e.week===f.spentWeek && e.hours!==0)) &&
     (!term || `${r.id} ${r.summary} ${r.handler} ${r.reporter}`.toLowerCase().includes(term)));

@@ -1,3 +1,4 @@
+import { uploadDetails, progressDetails } from './pie-detail-model.js';
 import "./styles.css";
 import { selectCohorts } from './cohorts.js';
 import { confirmedFamilyPlan } from './family-plan.js';
@@ -14,7 +15,7 @@ import { renderFamilyAnalysis } from "./issues-view.js";
 import { renderWeeklyHours, renderWeeklyMonthRow } from "./weekly-hours.js";
 import { renderWeeklyFamilyEffort } from "./weekly-family-effort.js";
 import { enableChartOrdering } from "./chart-order.js";
-import { familyOutcome, uploadedFamilyRows, uploadedFamilyCohort, tidpUploadDetails } from "./family-outcomes.js";
+import { familyOutcome, uploadedFamilyRows, uploadedFamilyCohort } from "./family-outcomes.js";
 import {
   agingBucket,
   buildContext,
@@ -162,7 +163,7 @@ function piePanel(id, title, slices, unit, source, { showSourceContext = false, 
     const arcLength = Math.min(length, 99.9999);
     const large = arcLength > 50 ? 1 : 0;
     const path = `M${point(20.4155, offset)} A20.4155,20.4155 0 ${large} 1 ${point(20.4155, offset + arcLength)} L${point(11.4155, offset + arcLength)} A11.4155,11.4155 0 ${large} 0 ${point(11.4155, offset)} Z`;
-    const mark = length > 0 ? `<path class="donut-slice" d="${path}" fill="${item.color}" role="button" tabindex="0" data-pie-detail="${id}" data-slice-filter="${item.filter}" data-slice-value="${escapeHtml(item.label)}" aria-label="${escapeHtml(`${title}: ${item.label}, ${number(item.value)} ${unit}. Open details`)}"><title>${escapeHtml(`${item.label}: ${number(item.value)} ${unit} — click for details`)}</title></path>` : "";
+    const mark = length > 0 ? `<path class="donut-slice" d="${path}" fill="${item.color}" role="button" tabindex="0" data-pie-detail="${id}" data-slice-filter="${item.filter || ""}" data-slice-value="${escapeHtml(item.label)}" aria-label="${item.interaction?.kind === "detail" ? "Open arithmetic balance details" : escapeHtml(`${title}: ${item.label}, ${number(item.value)} ${unit}. Open details`)}"><title>${escapeHtml(`${item.label}: ${number(item.value)} ${unit} — click for details`)}</title></path>` : "";
     offset += length;
     return mark;
   }).join("");
@@ -187,7 +188,7 @@ function piePanel(id, title, slices, unit, source, { showSourceContext = false, 
       return `<g class="donut-label"><polyline points="${item.x},${item.y} ${lane},${item.y} ${lane},${y} ${end},${y}"/><circle cx="${item.x}" cy="${item.y}" r=".5" fill="${item.color}"/><text x="${textX}" y="${y - 1}" text-anchor="${right ? 'start' : 'end'}">${escapeHtml(labelNames[item.label] || item.label)}<tspan x="${textX}" dy="3.5">${number(item.value)} · ${share}%</tspan></text></g>`;
     }).join("");
   }).join("");
-return `<details class="panel pie-panel" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span class="panel-expanded-label">Collapse</span><span class="panel-collapsed-label">Expand</span></summary><div class="pie-layout"><div class="donut-wrap"><svg viewBox="${id === 'returned-errors' ? '-64 -10 165 62' : '-46 -10 134 62'}" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button data-set-filter="${item.filter}" data-filter-value="${item.label}" class="pie-key ${state.filters[item.filter] === item.label ? "selected" : ""}" aria-pressed="${state.filters[item.filter] === item.label}"><i style="background:${item.color}"></i><span>${item.label}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div><details class="chart-source"><summary>${escapeHtml(disclosureTitle)}</summary><h3>Purpose and how to read this chart</h3><p>${source}</p>${renderLegendDefinitions(slices, escapeHtml, item => `Group ${item.label} from source field ${item.filter}; values are ${unit}, and percentages are shares of the displayed total.`)}${showSourceContext ? `<p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p>` : ""}</details></details>`;
+return `<details class="panel pie-panel" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span class="panel-expanded-label">Collapse</span><span class="panel-collapsed-label">Expand</span></summary><div class="pie-layout"><div class="donut-wrap"><svg viewBox="${id === 'returned-errors' ? '-64 -10 165 62' : '-46 -10 134 62'}" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button ${item.interaction?.kind === "detail" ? `data-pie-detail="${id}" data-slice-value="${escapeHtml(item.label)}" aria-label="Open arithmetic balance details"` : item.interaction?.kind === "none" ? "disabled" : `data-set-filter="${item.filter}" data-filter-value="${escapeHtml(item.label)}" aria-pressed="${state.filters[item.filter] === item.label}"`} class="pie-key ${item.interaction?.kind !== "detail" && state.filters[item.filter] === item.label ? "selected" : ""}"><i style="background:${item.color}"></i><span>${item.label}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div><details class="chart-source"><summary>${escapeHtml(disclosureTitle)}</summary><h3>Purpose and how to read this chart</h3><p>${source}</p>${renderLegendDefinitions(slices, escapeHtml, item => item.interaction?.kind === "detail" ? "Arithmetic balance: planned total minus uploaded total. Open a summary; this value does not identify a Family cohort." : `Group ${item.label} from source field ${item.filter}; values are ${unit}, and percentages are shares of the displayed total.`)}${showSourceContext ? `<p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p>` : ""}</details></details>`;
 }
 
 function kpi(label, value, note, tone = "", action = "") {
@@ -344,7 +345,7 @@ function overviewView(scoped) {
   return `${heading()}
 
     <div class="grid-2 overview-charts">
-      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: pendingLabel, value: Math.max(0, familyKeys.size - uploadedCount), color: "var(--amber)", filter: "upload" }], "families in TIDP", evidenceScoped ? 'The center retains the native planning baseline. Uploaded counts all project uploads in the selected evidence only. Amber means not matched in this evidence selection, not proof that the Family has never been uploaded. Clear evidence filters for full-snapshot coverage.' : `This chart compares the planned RFA total with all uploaded project Families. Linked TIDP coverage remains ${linkedUploadCount}/${familyKeys.size}; ${familyKeys.size - linkedUploadCount} planned names have no linked upload. The amber count is the arithmetic balance, not the unmatched-name list. This chart shows upload progress for the unique Families in the TIDP RFA scope. The center is the total number of Families. Green counts all project uploads; amber is planned total minus uploads. Each percentage is its share of the total. Click a slice to view its Families, or select a legend item to filter the dashboard.`, { disclosureTitle: "Chart purpose and legend definitions", showSourceContext: false })}
+      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: pendingLabel, value: Math.max(0, familyKeys.size - uploadedCount), color: "var(--amber)", interaction: { kind: "detail", target: "upload-arithmetic-balance" } }], "families in TIDP", evidenceScoped ? 'The center retains the native planning baseline. Uploaded counts all project uploads in the selected evidence only. Amber means not matched in this evidence selection, not proof that the Family has never been uploaded. Clear evidence filters for full-snapshot coverage.' : `This chart compares the planned RFA total with all uploaded project Families. Linked TIDP coverage remains ${linkedUploadCount}/${familyKeys.size}; ${familyKeys.size - linkedUploadCount} planned names have no linked upload. The amber count is the arithmetic balance, not the unmatched-name list. This chart shows upload progress for the unique Families in the TIDP RFA scope. The center is the total number of Families. Green counts all project uploads; amber is planned total minus uploads. Each percentage is its share of the total. Open Uploaded for Family details; its legend filters uploads. The amber slice and legend open arithmetic balance details without changing filters.`, { disclosureTitle: "Chart purpose and legend definitions", showSourceContext: false })}
       ${piePanel("ticket-hours", "Annotation Project Ticket Hours", hours, "total hours", "This chart shows recorded annotation ticket hours. The center is total hours. Green represents Positive work (including Re-Assessment); red represents Negative work. Numbers are hours and percentages show each group's share of the total. Each ticket contributes its recorded hours once; tickets without recorded hours are excluded. Click a slice for its tickets, or a legend item to filter the dashboard.")}
     </div>
     ${piePanel("positive-work-type", "Positive Hours by Work Type", positiveByWork, "positive hours", "This chart shows Positive hours (including Re-Assessment) by work type. The center is total Positive hours. Each color is a work type; numbers are recorded hours and percentages are shares of the total. Each ticket contributes once to its primary work type. Click a slice for its tickets, or a legend item to filter the dashboard.")}
@@ -748,15 +749,7 @@ function openPieDetails(id, filter, value, trigger) {
     rows = uploadedFamilyRows(scoped.families, data.meta.asOf).filter(r => linked.has(r.id) === (value === "Linked to TIDP"));
     columns = ["id", "name", "category", "uploader", "end"];
   } else if (id === "family-upload") {
-    const uploaded = uploadedFamilyRows(scoped.families, data.meta.asOf);
-    if (value === "Uploaded") {
-      rows = uploaded;
-      columns = ["id", "name", "category", "uploader", "end"];
-    } else {
-      const plan = new Set(scoped.deliverables.filter(r => r.workType === "Revise the RFA library" && r.familyKey).map(r => r.familyKey)).size;
-      rows = [{ name: "Arithmetic balance, not an unmatched Family list", planned: plan, uploaded: uploaded.length, balance: Math.max(0, plan - uploaded.length) }];
-      columns = ["name", "planned", "uploaded", "balance"];
-    }
+    ({ rows, columns } = uploadDetails(value === 'Uploaded' ? 'uploaded' : 'balance', scoped, data.meta.asOf));
   } else {
     rows = scoped.tickets.filter((r) => (filter === "active" ? hourClass(r) : r[filter]) === value && (!id.startsWith("positive-") || hourClass(r) === "Positive"));
     columns = ["id", "summary", "active", "reporter", "handler", "status", "actualHours", "end"];
@@ -771,7 +764,7 @@ function renderPieDetails() {
   const rows = selectTableRows(s);
   const rowMarkup = (r) => `<tr>${s.columns.map((key) => `<td>${escapeHtml(r[key] ?? "—")}</td>`).join("")}</tr>`;
   const labels = { id: "ID", title: "Family / deliverable", summary: "Ticket", active: "Classification", reporter: "Reporter", handler: "Handler", status: "Status", actualHours: "Hours", created: "Created date", end: "End date", system: "System", owner: "Owner", workType: "Work type", plannedStartWeek: "First planned CW", plannedFinishWeek: "Last planned CW" };
-  Object.assign(labels, { name: "Family", category: "Category", uploader: "Uploader", reworkOutcome: "Outcome", ticketStatus: "Ticket status", ticketNumber: "Ticket number", ticketId: "Ticket ID", errorCount: "Error types count", errorTypes: "Error types" });
+  Object.assign(labels, { name: s.id === "family-upload" && s.columns.includes("balance") ? "Summary" : "Family", category: "Category", uploader: "Uploader", reworkOutcome: "Outcome", ticketStatus: "Ticket status", ticketNumber: "Ticket number", ticketId: "Ticket ID", errorCount: "Error types count", errorTypes: "Error types" });
   Object.assign(labels, { errorType: 'Error type', planned: 'Planned total', uploaded: 'Uploaded total', balance: 'Arithmetic balance', actualCfm: 'Actual_CFM date', actualTrm: 'Actual_TRM date', cfmKind: 'CFM evidence kind', cfmCell: 'CFM source cell', familyKey: 'Family key', leftSource:'Family source', leftValue:'Family value', rightSource:'Compared source', rightValue:'Compared value', resolution:'Review state' });
   document.querySelector("#drawer-root").innerHTML = `<div class="drawer-backdrop" data-close-drawer></div><aside class="drawer chart-detail-drawer" role="dialog" aria-modal="true" aria-labelledby="pie-detail-title"><button class="drawer-close" data-close-drawer aria-label="Close">×</button><h2 id="pie-detail-title">${escapeHtml(meta.title)} — ${escapeHtml(s.value)}</h2>${tableExportButton("detail", `${meta.title} - ${s.value}`, s.columns.map(key => ({ key, label: labels[key] || key })), () => selectTableRows(s))}<div class="table-wrap" tabindex="0" aria-label="Scrollable detail records"><table><thead><tr>${s.columns.map((key) => `<th aria-sort="${s.sort === key ? s.descending ? "descending" : "ascending" : "none"}"><button data-pie-sort="${key}">${labels[key]} ${s.sort === key ? s.descending ? "↓" : "↑" : "↕"}</button><input data-pie-search="${key}" aria-label="Search ${labels[key]} in details" value="${escapeHtml(s.searches[key] || "")}" /></th>`).join("")}</tr></thead><tbody>${rows.slice(0, 100).map(rowMarkup).join("") || `<tr><td colspan="${s.columns.length}" class="empty">No matching records.</td></tr>`}</tbody></table></div><div class="detail-count" role="status">${fmt(Math.min(100, rows.length))} / ${fmt(rows.length)} records</div></aside>`;
   const scroller = document.querySelector(".chart-detail-drawer .table-wrap");
@@ -904,12 +897,10 @@ function wireEvents() {
       const meta = pieDetails.get("family-progress");
       const week = Number(progress.dataset.progressWeek);
       const series = progress.dataset.progressDetail;
-      const cutoff = meta.weekEnd(week) < data.meta.asOf ? meta.weekEnd(week) : data.meta.asOf;
-      const dateField = series === "MEP Transmittal" ? "actualTrm" : "actualCfm";
-      const rows = meta.rows.filter((r) => series === "Plan" ? r.plannedStartWeek && r.plannedStartWeek <= week : r[dateField] && r[dateField] <= cutoff);
+      const {rows,columns} = progressDetails(meta,series,week,data.meta.asOf);
       if (!rows.length) return;
       pieDetailTrigger = progress;
-      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns: ["ticketId", "title", "system", "owner", "plannedStartWeek", dateField, 'cfmKind', 'cfmCell'], page: 1, sort: "", descending: true, searches: {} };
+      pieDetailSelection = { id: "family-progress", value: `${series} · CW${week}`, rows, columns, page: 1, sort: "", descending: true, searches: {} };
       renderPieDetails(); document.querySelector(".drawer-close")?.focus(); return;
     }
     const slice = event.target.closest("[data-pie-detail]");
@@ -956,7 +947,7 @@ function wireEvents() {
   });
   document.addEventListener("keydown", (event) => {
     const slice = event.target.closest("[data-pie-detail], [data-progress-detail]");
-    if (slice && ["Enter", " "].includes(event.key)) { event.preventDefault(); slice.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+    if (slice && slice.tagName.toLowerCase() !== "button" && ["Enter", " "].includes(event.key)) { event.preventDefault(); slice.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
     const drawer = document.querySelector(".drawer");
     if (!drawer) return;
     if (event.key === "Escape") closeDrawer();
