@@ -100,7 +100,7 @@ def quarter_hours(value: Any) -> float | None:
 
 
 def validate_family_source(frame, matrix):
-    weights = dict(zip(matrix['Ticket ID'], matrix['Weigh Score']))
+    ticket_ids = set(matrix['Ticket ID'])
     keys, seen_tickets = set(), set()
     for index, row in frame.iterrows():
         key = normalize_family_name(row['Family Name'])
@@ -111,12 +111,9 @@ def validate_family_source(frame, matrix):
         keys.add(key)
         if len(ids) != row['Ticket_Count'] or len(ids) != len(set(ids)):
             raise ValueError(f"{where}: Ticket_Count={row['Ticket_Count']}, expected {len(set(ids))}")
-        if any(i not in weights or i in seen_tickets for i in ids):
+        if any(i not in ticket_ids or i in seen_tickets for i in ids):
             raise ValueError(f'{where}: orphan or unapproved ticket fanout {ids}')
         seen_tickets.update(ids)
-        expected = sum(weights[i] for i in ids)
-        if row['Weigh Score Sum'] != expected:
-            raise ValueError(f"{where}: Weigh Score Sum={row['Weigh Score Sum']}, expected {expected}")
 
 
 def main() -> None:

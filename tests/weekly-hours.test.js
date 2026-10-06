@@ -32,3 +32,26 @@ test("overlay values use visible, collision-separated label rectangles", () => {
     assert.ok(!(a.x < b.x + 69.99 && a.x + 69.99 > b.x && a.y < b.y + 43.99 && a.y + 43.99 > b.y));
   }
 });
+
+test('hours forecast excludes partial week, preserves zero and respects selected-week availability',async()=>{
+  const {forecastWeeklyHours}=await import('../src/weekly-hours.js');
+  const weeks=Array.from({length:40},(_,i)=>({key:`2026-CW${String(i+1).padStart(2,'0')}`,value:i===39?9999:100}));
+  const forecast=forecastWeeklyHours(weeks,'2026-09-30');assert.equal(forecast.rate,0);assert.equal(forecast.points[0].value,100);assert.equal(forecast.points[0].key,'2026-CW41');assert.equal(forecast.points.length,3);
+  assert.equal(forecastWeeklyHours(weeks,'2026-09-30','2026-CW39').points.length,0);
+  assert.equal(forecastWeeklyHours(weeks.map(w=>({...w,value:0})),'2026-09-30').rate,0);
+  assert.equal(forecastWeeklyHours(weeks.slice(0,2),'2026-09-30').points.length,0);
+});
+
+test('weekly hours OLS extrapolates fitted intercept and slope and floors negative estimates',async()=>{
+  const {forecastWeeklyHours}=await import('../src/weekly-hours.js');
+  const weeks=Array.from({length:40},(_,i)=>({key:`2026-CW${String(i+1).padStart(2,'0')}`,value:10*(i+1)+5}));
+  const result=forecastWeeklyHours(weeks,'2026-09-30');assert.ok(Math.abs(result.rate-10)<1e-10);assert.ok(Math.abs(result.intercept-5)<1e-10);result.points.forEach((p,i)=>assert.ok(Math.abs(p.value-[415,425,435][i])<1e-10));
+  const falling=weeks.map((w,i)=>({...w,value:400-10*(i+1)}));assert.deepEqual(forecastWeeklyHours(falling,'2026-09-30').points.map(p=>p.value),[0,0,0]);
+});
+
+test('hours regression uses CW22–39 except CW36 without removing actual evidence',async()=>{
+  const {forecastWeeklyHours}=await import('../src/weekly-hours.js');
+  const weeks=Array.from({length:40},(_,i)=>({key:`2026-CW${String(i+1).padStart(2,'0')}`,value:i===35||i<21||i===39?99999:10*(i+1)+5}));
+  const result=forecastWeeklyHours(weeks,'2026-09-30');assert.ok(Math.abs(result.rate-10)<1e-10);assert.ok(Math.abs(result.intercept-5)<1e-10);result.points.forEach((p,i)=>assert.ok(Math.abs(p.value-[415,425,435][i])<1e-10));assert.equal(weeks[35].value,99999);
+  assert.equal(forecastWeeklyHours(weeks.filter(w=>w.key!=='2026-CW28'),'2026-09-30').points.length,0);
+});

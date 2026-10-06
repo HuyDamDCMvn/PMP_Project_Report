@@ -18,11 +18,8 @@ class SourceIntegrityTests(unittest.TestCase):
         validate_family_source(scope, matrix)
         self.assertEqual(len(frame), 2044)
         self.assertEqual(len(scope), 2002)
-        self.assertEqual(scope['Weigh Score Sum'].sum(), 4004)
         row = scope[scope['Family Name'] == '434_PF_CO_cCap_Mapress'].iloc[0]
-        self.assertEqual(row['Weigh Score Source'], '1 ticket; primary=2; sum=2')
         self.assertEqual(row['Ticket_Count'], 1)
-        self.assertEqual(row['Weigh Score Sum'], 2)
         w = openpyxl.load_workbook(p, read_only=True, data_only=True)
         # Workbook metadata retains the earlier 2043-row snapshot; actual
         # Family_vs_Tickets rows above are authoritative, not this cached note.
@@ -37,15 +34,21 @@ class SourceIntegrityTests(unittest.TestCase):
             self.assertEqual(w['Summary'].cell(r, 2).value, sum(x[5] == decision for x in rows))
         w.close()
 
-    def test_bad_weight_count_fanout_and_key(self):
-        row = {'Family Name': 'Cap', 'Ticket_IDs': '72579', 'Ticket_Count': 1, 'Weigh Score Sum': 2}
-        matrix = pd.DataFrame([{'Ticket ID': 72579, 'Weigh Score': 2}])
-        for field, value in [('Weigh Score Sum', 4), ('Ticket_Count', 2), ('Ticket_IDs', '999')]:
+    def test_bad_count_fanout_and_key(self):
+        row = {'Family Name': 'Cap', 'Ticket_IDs': '72579', 'Ticket_Count': 1}
+        matrix = pd.DataFrame([{'Ticket ID': 72579}])
+        for field, value in [('Ticket_Count', 2), ('Ticket_IDs', '999')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 validate_family_source(pd.DataFrame([{**row, field: value}]), matrix)
         for second in [row, {**row, 'Family Name': 'Other'}]:
             with self.assertRaises(ValueError):
                 validate_family_source(pd.DataFrame([row, second]), matrix)
+
+    def test_weight_columns_are_optional_and_ignored(self):
+        row = {'Family Name': 'Cap', 'Ticket_IDs': '72579', 'Ticket_Count': 1}
+        matrix = pd.DataFrame([{'Ticket ID': 72579}])
+        validate_family_source(pd.DataFrame([row]), matrix)
+        validate_family_source(pd.DataFrame([{**row, 'Weigh Score Sum': 999}]), matrix)
 
     def test_equivalence_ticket_mismatch(self):
         row = {'Uploaded family': 'Cap', 'Equivalent TIDP family': 'Plan', 'In TIDP (Y/N)': 'Y', 'Ticket ID': '72578'}

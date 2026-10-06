@@ -246,3 +246,15 @@ Upload context annotations use English text, 14-unit radius pale green markers (
 ## Arithmetic donut interaction — 6 October 2026
 
 Legend actions explicitly distinguish detail-only, filter and disabled presentation. The arithmetic remainder opens a one-record summary, has no aria-pressed state, and does not create a cross-filter. SVG and legend detail actions share the drawer handler; native buttons retain native Enter/Space activation. Escape restores trigger focus. Uploaded remains a real filterable cohort.
+
+## Upload detail and weekly hours forecast — 06 October 2026
+The amber upload action now opens one row per distinct planned RFA key without an eligible linked upload in the selected evidence; it retains original TIDP title, System, Owner and first planned CW. No-filter list count is 294, distinct from the unchanged arithmetic remainder 293. The table shares sorting, search, scrolling and full CSV export. Absence of a linked record is not proof of absence on the webapp.
+Weekly project hours adds a dashed brown OLS linear-regression forecast for CW41–CW43 fitted to scoped weekly hours over CW22–CW39, excluding user-designated outlier CW36. Predictions use the fitted intercept and slope and are floored at zero; partial CW40 is excluded from fitting. CW36 remains visible in actual data and recorded-hour totals; only its regression input is excluded. Partial CW40 remains actual only. Future observations are null; forecast marks are noninteractive and do not contribute to recorded-hour totals. A single spent-week selection disables the scenario. Existing panel sizing/collapse and local scrolling remain in use.
+
+The weekly hours forecast includes the observed CW40 point as a visual connector to CW41. This anchor has no duplicate forecast label or forecast evidence action; CW41–CW43 predictions remain fitted-intercept OLS values.
+
+Weekly linked issue detail tables display Ticket ID instead of generated Family ID. Each Family/error-flag remains one row; multiple direct Ticket IDs share the same cell, preserving the error-count denominator and full export.
+
+User decision 06/10/2026: assign error responsibility for Family 420_PF_CS_cCap_Mapress / Ticket 72176 to HKG — Nhut Le. The heatmap and shared errorSystem selection use the same stable-key mapping. No TIDP equivalence is restored, no authoritative workbook is changed, and total error flags remain 1116. Other unknown Families retain Unknown system.
+
+User decision 06/10/2026: classify Family 434_PF_CO_cCap_MapressFKMBlue / Ticket 72578 as Returned. Scope is the distinct stable Family key and direct Ticket ID; original blank outcome remains in the dataset/workbook. Effective upload outcomes are One pass 1500, Returned 502, Unclassified 0. This ticket has zero classified error types; error flags remain 1116. Family identity, dates, hours and TIDP equivalence are unchanged.

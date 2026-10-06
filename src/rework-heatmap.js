@@ -3,12 +3,16 @@ import { familyTicketRows } from './returned-tickets.js';
 export const SYSTEM_OWNERS = { 'ELT/MSR': 'Hanh Pham', RLT: 'Lam Truong', SAN: 'Thuong Huynh', 'SPR MED': 'Sang Duong', HKG: 'Nhut Le' };
 
 // Use the approved Family-to-TIDP links, never infer systems from names or people.
-export function familyErrorSystems(deliverables) {
+export function familyErrorSystems(deliverables, families = []) {
   const map = new Map();
   for (const row of deliverables) {
     if (!row.familyId || !row.system) continue;
     if (!map.has(row.familyId)) map.set(row.familyId, new Set());
     map.get(row.familyId).add(row.system);
+  }
+  // User-approved error responsibility assignment (06/10/2026), not a TIDP equivalence link.
+  for (const family of families) {
+    if (family.key === '420pfcsccapmapress' && family.ticketIds?.includes(72176)) map.set(family.id, new Set(['HKG']));
   }
   return new Map([...map].map(([id, systems]) => [id, systems.size === 1 ? [...systems][0] : 'Multiple systems']));
 }
@@ -22,6 +26,10 @@ export function reworkHeatmap(families, systems) {
 
 export function renderReworkHeatmap({ families, systems, filters, panel, register, escapeHtml: esc, fmt, asOf }) {
   const model = reworkHeatmap(families, systems);
+  const totalFlags = model.rows.reduce((sum,row)=>sum+row.cells.reduce((n,cell)=>n+cell.families.length,0),0);
+  const byType = model.types.map((type,i)=>({type,count:model.rows.reduce((sum,row)=>sum+row.cells[i].families.length,0)})).sort((a,b)=>b.count-a.count);
+  const bySystem = model.rows.map(row=>({system:row.system,count:row.cells.reduce((sum,cell)=>sum+cell.families.length,0)})).sort((a,b)=>b.count-a.count);
+  const analysis = totalFlags ? `There are ${fmt(totalFlags)} error flags in the current selection. The most frequent error type is ${esc(byType[0].type.replaceAll('_',' '))} (${fmt(byType[0].count)}; ${(byType[0].count/totalFlags*100).toFixed(1)}%). ${esc(bySystem[0].system)} has the largest total (${fmt(bySystem[0].count)} error flags). Prioritize the darkest cells to identify recurring issues that need targeted checks. Counts show error volume; they do not measure error rates or individual performance.` : 'No returned-Family error flags match the current selection.';
   const max = Math.max(1, ...model.rows.flatMap(r => r.cells.map(c => c.families.length)));
   const totals = model.types.map((type, column) => {
     const rows = model.rows.flatMap(row => row.cells[column].families);
@@ -35,5 +43,5 @@ export function renderReworkHeatmap({ families, systems, filters, panel, registe
     register(id, { title: `${r.system} · ${c.type}`, rows: familyTicketRows(c.families), columns: ['ticketId', 'name', 'category', 'uploader', 'reworkOutcome', 'end'] });
     return `<div class="heat-cell level-${count ? Math.ceil(count / max * 4) : 0}"><button data-issue-detail="${id}" aria-label="Open evidence: ${esc(r.system)} / ${esc(c.type)}: ${count} error flags">${fmt(count)}</button></div>`;
   }).join('')}`).join('')}<strong class="error-total">Total</strong>${totals}</div></div>` : '<div class="empty" role="status">No Returned Families match the current filters.</div>';
-  return panel('Returned errors by System', '', body + `<details class="chart-source"><summary>Chart purpose and legend definitions</summary><p>Locate concentrations of returned-Family errors by System. Each source X counts once per Family and error type; a Family can have several types. Darker blue means more flags (0–${fmt(max)} in this scope). Source: Family_Upload_vs_Annotation_Tickets_Checked.xlsx / Family_vs_Tickets, project DCMvn_Annotation Project, uploaded Returned Families through ${esc(asOf)}. Systems follow approved links to DCMvn_TIDP_Combined_20260930.xlsx. Missing links remain Unknown system; conflicting systems remain Multiple systems and are counted once, not duplicated. Select a row or column to compose filters. Click a cell to open Family evidence without changing filters. Rebuild with npm run data:build.</p></details>`, 'issues-panel');
+  return panel('Returned errors by System', '', body + `<details class="chart-source"><summary>Chart explanation and analysis</summary><p>Rows represent Systems and their responsible owners; columns represent error types. Each cell counts affected returned Families for that System and error type. A Family is counted once per error type and can appear in several columns. Darker blue indicates a higher count within the current selection; a pale cell with zero means no recorded cases. The Total row sums each error type across all Systems. These totals count error flags, so they can exceed the number of distinct Families or tickets.</p><p>${analysis}</p><p>Select a System row or error-type column to filter the related dashboard views. Select a numbered cell to open its Family and Ticket ID details. Combine selections to investigate a specific issue; remove filter chips or use Reset Filters to return to the full view.</p></details>`, 'issues-panel');
 }

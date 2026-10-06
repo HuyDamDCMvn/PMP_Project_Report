@@ -11,8 +11,6 @@ s = w['Family_vs_Tickets']
 h = {c.value: c.column for c in s[1]}
 r = next(r for r in range(2, s.max_row + 1) if s.cell(r, 1).value == '434_PF_CO_cCap_Mapress')
 assert str(s.cell(r, h['Ticket_IDs']).value) == '72579'
-s.cell(r, h['Weigh Score Sum'], 2)
-s.cell(r, h['Weigh Score Source'], '1 ticket → 2 (Mantis)')
 w['Meta']['B15'] = s.max_row - 1
 w['Meta']['B31'] = 0
 w.save(p)

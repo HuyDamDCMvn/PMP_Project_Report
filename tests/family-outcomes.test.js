@@ -42,3 +42,8 @@ test("uploaded outcomes use the source field, unique families and snapshot cutof
   assert.deepEqual(rows.filter(row => familyOutcome(row) === "Returned").map(row => row.id), ["2"]);
   assert.equal(familyOutcome({ reworkOutcome: "New outcome" }), "Unclassified");
 });
+
+test('approved Ticket 72578 outcome is Returned without inventing error flags or mutating the original',()=>{
+  const family={id:'stable-test',key:'434pfcoccapmapressfkmblue',ticketIds:[72578],reworkOutcome:null,reworkErrors:[],end:'2026-09-30'};
+  assert.equal(familyOutcome(family),'Returned');const rows=uploadedFamilyRows([family],'2026-09-30');assert.equal(rows[0].reworkOutcome,'Returned');assert.equal(rows[0].sourceReworkOutcome,null);assert.equal(family.reworkOutcome,null);assert.deepEqual(rows[0].reworkErrors,[]);
+});

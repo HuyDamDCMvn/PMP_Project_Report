@@ -14,3 +14,8 @@ test('error flags count once under explicit, unknown or conflicting system links
   assert.equal(model.rows.flatMap(r => r.cells).reduce((sum, c) => sum + c.families.length, 0), 4);
   assert.ok(model.rows.some(r => r.system === 'Unknown system'));
 });
+
+test('approved Mapress error ownership follows stable key and Ticket ID without adding a planning link',()=>{
+  const families=[{id:'reordered-id',key:'420pfcsccapmapress',ticketIds:[72176]},{id:'other',key:'another',ticketIds:[999]}];
+  const systems=familyErrorSystems([],families);assert.equal(systems.get('reordered-id'),'HKG');assert.equal(systems.has('other'),false);
+});

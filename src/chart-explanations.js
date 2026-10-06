@@ -20,5 +20,5 @@ export const legendDefinitions = {
 };
 
 export function renderLegendDefinitions(items, escapeHtml, fallback) {
-  return `<h3>Legend definitions</h3><dl>${items.map(item => `<dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(legendDefinitions[item.label] || fallback(item))}</dd>`).join('')}</dl>`;
+  return `<h3>Legend definitions</h3><dl>${items.map(item => `<dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.definition || legendDefinitions[item.label] || fallback(item))}</dd>`).join('')}</dl>`;
 }

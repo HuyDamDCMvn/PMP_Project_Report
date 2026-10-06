@@ -26,6 +26,14 @@ These are project-specific rules for the `PMP Dashboard` repository only.
 - Exclude Family records from every other project from generated datasets, calculations, KPIs, filters, charts, tables and totals.
 - Apply this project filter while processing the authoritative Family workbook, before producing any derived Family output.
 
+## Weigh Score policy
+
+- User decision (06/10/2026): Weigh Score is no longer a dashboard parameter.
+- Ignore Weigh Score, Weigh Score Sum and Weigh Score Source in dashboard processing, calculations, validation and source-repair steps. Missing or inconsistent values must not block data refresh or deployment.
+- Preserve these columns in source workbooks; do not correct their values for dashboard purposes.
+- Continue validating project scope, Family identity, Ticket IDs, Ticket_Count, dates, classifications and recorded hours independently.
+- This rule applies only to this repository and project.
+
 ## Dashboard completion and delivery
 
 - After completing dashboard work, start the dashboard locally and leave it running so the user can inspect it.

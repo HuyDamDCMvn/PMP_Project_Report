@@ -39,3 +39,10 @@ test('active CFM and TRM detail selection preserves dates and source provenance'
   assert.ok(transmittal.columns.includes('actualTrm'));
   assert.ok(actual.rows.every(r=>r.cfmKind&&r.cfmCell));
 });
+
+test('pending drawer deduplicates TIDP keys and excludes eligible linked uploads',()=>{
+  const scoped=selectCohorts(data);const pending=uploadDetails('pending',scoped,data.meta.asOf);
+  assert.equal(pending.rows.length,294);assert.equal(new Set(pending.rows.map(r=>r.familyKey)).size,294);
+  const empty=uploadDetails('pending',{...scoped,families:[]},data.meta.asOf);assert.equal(empty.rows.length,2295);
+  assert.equal(uploadDetails('pending',selectCohorts(data,{owner:'Hanh Pham'}),data.meta.asOf).rows.length,5);
+});

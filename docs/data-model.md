@@ -88,3 +88,7 @@ The processing layer checks missing ticket dates/handlers, duplicate ticket IDs,
 - Dependency state: schedule evidence + family match + related unresolved ticket state.
 
 No black-box risk score is used.
+
+
+## Weigh Score retired — 6 October 2026
+Weigh Score is not a dashboard parameter. The pipeline ignores its source columns and does not require, reconcile, repair or validate their values. Workbook columns are preserved. Family identity, direct Ticket IDs, Ticket_Count, project scope, dates, classifications and recorded hours remain validated independently.

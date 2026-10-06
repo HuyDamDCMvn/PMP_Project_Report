@@ -2,6 +2,7 @@ import { issueMetrics, personName } from "./issues.js";
 import { agingBucket } from "./domain.js";
 import { familyOutcome, familyProductivity } from "./family-outcomes.js";
 import { renderWeeklyMonthRow, renderWeeklySeries } from "./weekly-hours.js";
+import { familyTicketRows } from './returned-tickets.js';
 import { weeklyIssueSeries } from './weekly-errors.js';
 
 const FAMILY_COLUMNS = ["id", "name", "category", "uploader", "reworkOutcome", "ticketStatus", "end"];
@@ -90,7 +91,7 @@ export function renderIssues(options) {
   const line = renderWeeklySeries({ weeks: chartWeeks, title: 'Weekly linked issues', axisLabel: 'Error flags per week', fmt, showMonths: true, weekSpacing: 70, minCanvasWidth: 1760, minPlotHeight: 250, pointMarks, legend: '', axis: { id: 'issues-axis-step', key: 'issueAxisStep', label: 'Y-axis step (counts)', min: 1, max: 1000, increment: 1, value: options.issueAxisStep || 5, controls: `<button class="button" data-toggle-issue-labels aria-pressed="${Boolean(options.showIssueLabels)}">${options.showIssueLabels ? 'Hide' : 'Show'} numeric labels</button>` },
     label: () => '',
     weekLabel: w => `<span class="issue-week-label">${w.key.slice(-2)}</span>`,
-    overlays: visibleSeries.map(s => ({ className: 'error-series', color: s.color, dash: s.dash, weeks: s.weeks, mark: w => evidence(`issues:errors:${s.index}:${w.key}`, `${s.type} · ${w.key} · ${w.value} ${s.unit}`, w.rows, fmt(w.value), pointMarks ? 'error-point-mark' : 'role-mark', s.type === 'Total issues' ? [...FAMILY_COLUMNS, 'errorType'] : FAMILY_COLUMNS).replace('<button ', `<button title="${options.escapeHtml(s.type)} · ${w.key}: ${w.value}" `) })) });
+    overlays: visibleSeries.map(s => ({ className: 'error-series', color: s.color, dash: s.dash, weeks: s.weeks, mark: w => evidence(`issues:errors:${s.index}:${w.key}`, `${s.type} · ${w.key} · ${w.value} ${s.unit}`, familyTicketRows(w.rows), fmt(w.value), pointMarks ? 'error-point-mark' : 'role-mark', s.type === 'Total issues' ? ['ticketId', ...FAMILY_COLUMNS.slice(1), 'errorType'] : ['ticketId', ...FAMILY_COLUMNS.slice(1)]).replace('<button ', `<button title="${options.escapeHtml(s.type)} · ${w.key}: ${w.value}" `) })) });
   const legend = `<div class="weekly-error-legend" aria-label="Show or hide error lines">${series.map(s => { const visible = !(options.hiddenErrorSeries || []).includes(s.type); return `<button data-toggle-error-series="${options.escapeHtml(s.type)}" aria-pressed="${visible}" aria-label="${visible ? 'Hide' : 'Show'} ${options.escapeHtml(s.type.replaceAll('_', ' '))} line"><svg viewBox="0 0 40 12" aria-hidden="true"><line x1="0" x2="40" y1="6" y2="6" stroke="${s.color}" stroke-width="3" stroke-dasharray="${s.dash}"/></svg>${options.escapeHtml(s.type.replaceAll('_', ' '))}<small>${visible ? 'Visible' : 'Hidden'}</small></button>`; }).join('')}</div>`;
   return heading() + familyChart + (options.returnedTicketChart || '') + returnedErrorChart + (options.errorHeatmap || '') + panel('Weekly linked issues', '', legend + (families.length ? line + (!visibleSeries.length ? '<p class="empty" role="status">All lines are hidden. Select a legend item to show a line.</p>' : '') : '<div class="empty" role="status">No uploaded Families match the current filters.</div>'), 'issues-panel');
 }

@@ -15,7 +15,7 @@ export function selectCohorts(data, f = {}, timeHistory) {
   const nativePlan = Boolean(f.system || planOwner || f.workType);
   const ticketRelationshipRequired = Boolean(f.system || planOwner);
   const planIds = new Set(deliverables.map(r=>r.familyId).filter(Boolean));
-  const systems = familyErrorSystems(data.deliverables);
+  const systems = familyErrorSystems(data.deliverables, data.families);
   const errorIds = f.returnedErrorCount ? new Set(returnedTicketErrors(uploadedFamilyRows(data.families,data.meta.asOf),data.tickets).filter(t=>t.returnedErrorCount===f.returnedErrorCount).map(t=>t.id)) : null;
   let families = data.families.filter(r =>
     (!nativePlan || planIds.has(r.id)) && (!errorIds || r.ticketIds.some(id=>errorIds.has(id))) &&

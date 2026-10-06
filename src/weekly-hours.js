@@ -7,6 +7,24 @@ export function weeklyHours(dataset, tickets, selectedWeek = "") {
   });
 }
 
+export function forecastWeeklyHours(weeks, asOf, selectedWeek = '') {
+  if (selectedWeek) return { points: [], rate: null };
+  const date = new Date(`${asOf}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return { points: [], rate: null };
+  const thursday = new Date(date); thursday.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const week = Math.ceil(((thursday - new Date(Date.UTC(thursday.getUTCFullYear(),0,1))) / 86400000 + 1) / 7);
+  const completed = date.getUTCDay() === 0 ? week : week - 1;
+  const sample = weeks.filter(w=>Number(w.key.slice(-2)) >= 22 && Number(w.key.slice(-2)) <= 39 && Number(w.key.slice(-2)) !== 36 && Number(w.key.slice(-2)) <= completed);
+  if (sample.length !== 17 || sample.some(w=>!Number.isFinite(w.value))) return { points: [], rate: null };
+  const meanX = sample.reduce((sum,w)=>sum+Number(w.key.slice(-2)),0)/sample.length;
+  const meanY = sample.reduce((sum,w)=>sum+w.value,0)/sample.length;
+  const denominator = sample.reduce((sum,w)=>sum+(Number(w.key.slice(-2))-meanX)**2,0);
+  if (!denominator) return { points: [], rate: null };
+  const rate = sample.reduce((sum,w)=>sum+(Number(w.key.slice(-2))-meanX)*(w.value-meanY),0)/denominator;
+  const intercept = meanY-rate*meanX;
+  return { rate, intercept, points: Array.from({length:Math.min(3,53-week)},(_,i)=>({key:`2026-CW${String(week+i+1).padStart(2,'0')}`,value:Math.max(0,intercept+rate*(week+i+1)),entries:[]})) };
+}
+
 // Keep labels inside the plot (outside Y ticks) and resolve neighbouring boxes
 // again after every scale change. Boxes include the full keyboard target.
 export function placeWeeklyLabels(points, width, bottom) {
@@ -99,12 +117,15 @@ export function renderWeeklySeries({ weeks, axisLabel, title, fmt, label, weekLa
 export function renderWeeklyHours({ dataset, tickets, filters, panel, register, escapeHtml: esc, fmt, axisStep = 200 }) {
   const title = "Weekly Annotation Project hours";
   if (!dataset) return panel(title, "", '<div class="empty" role="status">Time-history data has not been generated. Run python scripts/build_weekly_hours.py.</div>', "issues-panel");
-  const weeks = weeklyHours(dataset, tickets, filters.spentWeek);
+  const actualWeeks = weeklyHours(dataset, tickets, filters.spentWeek);
+  const forecast = forecastWeeklyHours(actualWeeks, dataset.meta.asOf, filters.spentWeek);
+  const weeks = [...actualWeeks, ...forecast.points.map(w=>({...w,value:null}))];
   const byId = new Map(tickets.map(t => [t.id, t]));
   const total = weeks.reduce((sum, w) => sum + w.value, 0);
   const problems = dataset.meta.failed + dataset.meta.unparsed;
-  const body = renderWeeklySeries({ weeks, title, showMonths: true, axisLabel: "Hours spent / week", fmt, axis: { id: "hours-axis-step", key: "hoursAxisStep", label: "Y-axis step (hours)", min: 10, max: 5000, increment: 10, value: axisStep },
+  const body = renderWeeklySeries({ weeks, title, currentWeek: actualWeeks.at(-1).key, overlays: forecast.points.length ? [{ className: "hours-forecast", color: "var(--brown)", dash: "6 4", weeks: weeks.map(w=>forecast.points.find(p=>p.key===w.key) || (w.key===actualWeeks.at(-1).key ? {...w, forecastAnchor:true} : {...w,value:null})), mark: w=>w.forecastAnchor ? "" :`<span class="role-mark" style="cursor:default" aria-label="${w.key}: forecast ${fmt(w.value)} hours">${fmt(w.value)}</span>` }] : [], legend: forecast.points.length ? "Hours spent / week · dashed brown: Forecast" : "Hours spent / week", showMonths: true, axisLabel: "Hours spent / week", fmt, axis: { id: "hours-axis-step", key: "hoursAxisStep", label: "Y-axis step (hours)", min: 10, max: 5000, increment: 10, value: axisStep },
     label: w => {
+      if (w.value === null) return "";
       const id = `spent:${w.key}`;
       const rows = w.entries.map(e => ({ ...byId.get(e.ticketId), actualHours: e.hours }));
       register(id, { title: `${title} · ${w.key} · net weekly hours`, rows, columns: ["id", "summary", "handler", "actualHours"], source: dataset.meta.rounding });
@@ -113,5 +134,5 @@ export function renderWeeklyHours({ dataset, tickets, filters, panel, register, 
     weekLabel: w => `<span class="issue-week-label">${w.key.slice(-2)}</span>`,
   });
   const differences = (dataset.audit || []).filter(a => byId.has(a.ticketId) && a.difference !== null && Math.abs(a.difference) > 0.011).length;
-  return panel(title, `Positive tickets · CW01–CW40 · ${fmt(total)} h`, `${problems ? `<p class="empty" role="status">Incomplete history: ${dataset.meta.failed} tickets unavailable; ${dataset.meta.unparsed} unrecognized events. Known hours only.</p>` : ""}${differences ? `<p class="cell-muted">History/workbook reconciliation: ${differences} tickets have different totals. History values shown; workbook KPIs unchanged.</p>` : ""}${tickets.some(t => ["Positive", "Re-Assessment"].includes(t.active)) ? body : '<div class="empty">No Positive tickets match the current filters.</div>'}<details class="chart-source"><summary>Chart purpose and parameters</summary><p>Purpose: track weekly project effort and identify changes in workload. The horizontal axis shows ISO weeks CW01–CW40 with a month row below. Month groups use the Thursday of each ISO week, including weeks spanning two months; the vertical axis shows hours. Y-axis step controls grid spacing only. Blue values show hours spent in each ISO week, not cumulative hours. Added time is offset by deleted time using the work date in ticket history. Net hours are rounded down to 0.25 h per ticket/week before adding them. Positive includes Re-Assessment. The amber line marks partial CW40 through ${esc(dataset.meta.asOf)}; later edits and work dates are excluded. This project-wide chart includes tickets not linked to uploaded Families. Click a number for weekly ticket hours or a CW label to filter related records. Retrieved ${esc(dataset.meta.retrievedAt)}. Workbook total-hour KPIs remain unchanged. Snapshot cutoff uses the calendar date, not an exact 16:00 reconstruction.</p></details>`, "issues-panel");
+  return panel(title, `Positive tickets · CW01–CW40 · ${fmt(total)} h`, `${problems ? `<p class="empty" role="status">Incomplete history: ${dataset.meta.failed} tickets unavailable; ${dataset.meta.unparsed} unrecognized events. Known hours only.</p>` : ""}${differences ? `<p class="cell-muted">History/workbook reconciliation: ${differences} tickets have different totals. History values shown; workbook KPIs unchanged.</p>` : ""}${tickets.some(t => ["Positive", "Re-Assessment"].includes(t.active)) ? body : '<div class="empty">No Positive tickets match the current filters.</div>'}<details class="chart-source"><summary>Chart purpose and parameters</summary><p>Purpose: track weekly project effort and identify changes in workload. The horizontal axis shows actual CW01–CW40 and up to three forecast weeks. Dashed brown Forecast fits ordinary least-squares linear regression to weekly hours from CW22–CW39, excluding CW36 as the user-designated outlier and excluding partial CW40. Forecast hours = max(0, fitted intercept + slope × week). The fitted line is extrapolated to CW41–CW43; a dashed connector starts at observed CW40 without changing the fitted predictions; it is an estimate, not recorded time or a completion prediction. It recalculates with ticket filters and is unavailable for a single spent-week selection. Forecast marks have no ticket detail action. Month groups use the Thursday of each ISO week, including weeks spanning two months; the vertical axis shows hours. Y-axis step controls grid spacing only. Blue values show hours spent in each ISO week, not cumulative hours. Added time is offset by deleted time using the work date in ticket history. Net hours are rounded down to 0.25 h per ticket/week before adding them. Positive includes Re-Assessment. The amber line marks partial CW40 through ${esc(dataset.meta.asOf)}; later edits and work dates are excluded. This project-wide chart includes tickets not linked to uploaded Families. Click a number for weekly ticket hours or a CW label to filter related records. Retrieved ${esc(dataset.meta.retrievedAt)}. Workbook total-hour KPIs remain unchanged. Snapshot cutoff uses the calendar date, not an exact 16:00 reconstruction.</p></details>`, "issues-panel");
 }

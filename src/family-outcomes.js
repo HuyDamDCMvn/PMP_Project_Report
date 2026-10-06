@@ -3,6 +3,8 @@ import { forecastCatchUp } from "./domain.js";
 import { linkedUploadDates } from './family-links.js';
 
 export function familyOutcome(family) {
+  // User-approved classification for this distinct Family / ticket, 06 October 2026.
+  if (family.key === "434pfcoccapmapressfkmblue" && family.ticketIds?.includes(72578)) return "Returned";
   if (family.reworkOutcome === "One_pass") return "One pass";
   if (family.reworkOutcome === "Returned") return "Returned";
   return "Unclassified";
@@ -13,7 +15,7 @@ export function uploadedFamilyRows(families, asOf) {
   for (const family of families) {
     if (!validSnapshotDate(family.end, asOf)) continue;
     const key = family.key || family.id;
-    if (!unique.has(key)) unique.set(key, family);
+    if (!unique.has(key)) unique.set(key, familyOutcome(family) === "Returned" && family.reworkOutcome !== "Returned" ? { ...family, sourceReworkOutcome: family.reworkOutcome, reworkOutcome: "Returned", outcomeDecision: "User classification 2026-10-06" } : family);
   }
   return [...unique.values()];
 }
