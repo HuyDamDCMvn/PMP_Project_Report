@@ -59,3 +59,6 @@ User-approved: clicking the work-package title/count opens the shared detail tab
 
 ## TIDP checklist source correction - 08/10/2026
 User-approved source edit: TIDP_Combined D2456:D2464 (TIDP-2455 through TIDP-2463), RLT / Lam Truong, changes Work type from Create Revit templates for each LPH to Output Checklists. Names, ownership and CW39 TRM / CW40 AUD / CW41 REV / CW42 CFM remain unchanged. Package totals become 14 templates and 64 checklists; overall planning population is unchanged.
+
+## Weekly linked issues upload line - 08/10/2026
+User-approved: retain Total issues and nine error lines; add a solid Uploaded Families line from the same weekly unique End Date cohort as Weekly Family uploads, including all outcomes. Use the existing count axis. No cumulative TRM or upload forecast is added.

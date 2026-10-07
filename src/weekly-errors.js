@@ -25,5 +25,7 @@ export function weeklyIssueSeries(families, asOf) {
     weeks: errors[0].weeks.map((week, i) => ({ key: week.key,
       value: errors.reduce((sum, s) => sum + s.weeks[i].value, 0),
       rows: errors.flatMap(s => s.weeks[i].rows.map(f => ({ ...f, errorType: s.type }))) })) },
-  ...errors.map(s => ({ ...s, unit: 'error flags' }))];
+  ...errors.map(s => ({ ...s, unit: 'error flags' })),
+  { type: 'Uploaded Families', color: 'var(--nav)', dash: '', unit: 'Families',
+    weeks: familyProductivity(families, [], asOf, { startWeek: 20 }).weeks.map(({ key, uploaded }) => ({ key, value: uploaded.length, rows: uploaded })) }];
 }
