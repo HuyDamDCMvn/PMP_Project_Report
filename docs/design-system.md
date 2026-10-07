@@ -258,3 +258,5 @@ Weekly linked issue detail tables display Ticket ID instead of generated Family 
 User decision 06/10/2026: assign error responsibility for Family 420_PF_CS_cCap_Mapress / Ticket 72176 to HKG — Nhut Le. The heatmap and shared errorSystem selection use the same stable-key mapping. No TIDP equivalence is restored, no authoritative workbook is changed, and total error flags remain 1116. Other unknown Families retain Unknown system.
 
 User decision 06/10/2026: classify Family 434_PF_CO_cCap_MapressFKMBlue / Ticket 72578 as Returned. Scope is the distinct stable Family key and direct Ticket ID; original blank outcome remains in the dataset/workbook. Effective upload outcomes are One pass 1500, Returned 502, Unclassified 0. This ticket has zero classified error types; error flags remain 1116. Family identity, dates, hours and TIDP equivalence are unchanged.
+
+08/10/2026: MIDP tables omit the Items column; Team / lot, Owner, Series and weekly columns retain their existing layout and behavior.

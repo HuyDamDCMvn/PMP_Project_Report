@@ -8,6 +8,8 @@ Latest approved presentation override: the Overview upload donut displays 2,295 
 
 MIDP row labels omit the MEP / prefix (user decision 07/10/2026); lot labels, source team/system values, grouping and filters remain unchanged.
 
+MIDP Items column is removed from tables and CSV (08/10/2026); weekly counts and package summary totals retain existing definitions.
+
 This section alone defines current behavior. Sections below `Historical notes` are retained audit history, not alternative calculation rules.
 
 | Measure | Current definition and snapshot baseline |

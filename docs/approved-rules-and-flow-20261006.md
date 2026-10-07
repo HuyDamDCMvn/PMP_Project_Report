@@ -50,3 +50,6 @@ Work Type-only ticket filtering uses Matrix Work Type directly, including ticket
 
 ## MIDP labels - 07/10/2026
 User-approved: omit the MEP / prefix from MIDP Team / lot row labels; retain the lot label and original system filter, grouping and source values.
+
+## MIDP Items column - 08/10/2026
+User-approved: remove the Items column from MIDP tables and their CSV export. This supersedes the proposed separate Actual/Plan totals; retain weekly values and package summary counts.

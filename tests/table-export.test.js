@@ -43,7 +43,7 @@ test("MIDP CSV repeats merged lot cells, keeps Actual above Plan and blank zero/
   assert.equal(model.rows[0].cw40, 1);
   assert.equal(model.rows[0].cw41, "");
   assert.equal(model.rows[1].cw41, 1);
-  assert.deepEqual(model.columns.map(c => c.label), ["Team / lot", "Owner", "Items", "Series", "CW39", "CW40", "CW41"]);
+  assert.deepEqual(model.columns.map(c => c.label), ["Team / lot", "Owner", "Series", "CW39", "CW40", "CW41"]);
 });
 
 test("download creates a CSV Blob and named local download, then removes link and releases URL", async t => {

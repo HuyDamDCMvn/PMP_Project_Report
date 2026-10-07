@@ -2,10 +2,10 @@ import { linkedUploadDates } from "./family-links.js";
 
 export function midpTableExport(groups, weeks, actualByGroup, reportingWeek) {
   const columns = [{ key: "lot", label: "Team / lot" }, { key: "owner", label: "Owner" },
-    { key: "items", label: "Items" }, { key: "series", label: "Series" },
+    { key: "series", label: "Series" },
     ...weeks.map(week => ({ key: `cw${week}`, label: `CW${String(week).padStart(2, "0")}` }))];
   const rows = groups.flatMap(group => {
-    const base = { lot: `${group.team} / ${group.batch}`, owner: [...new Set(group.records.map(r => r.owner))].sort().join("; "), items: group.records.length };
+    const base = { lot: `${group.team} / ${group.batch}`, owner: [...new Set(group.records.map(r => r.owner))].sort().join("; ") };
     const actual = actualByGroup.get(group.key) || [];
     return ["Actual", "Plan"].map(series => ({ ...base, series, ...Object.fromEntries(weeks.map(week => {
       const count = series === "Plan" ? group.weeks.get(week)?.ids.size : week <= reportingWeek ? actual.filter(row => row.actualWeek === week).length : 0;
