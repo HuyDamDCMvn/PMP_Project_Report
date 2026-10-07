@@ -56,3 +56,6 @@ User-approved: remove the Items column from MIDP tables and their CSV export. Th
 
 ## MIDP package details - 08/10/2026
 User-approved: clicking the work-package title/count opens the shared detail table with all filtered planned TIDP rows counted in that summary. The disclosure arrow retains expand/collapse. Opening details does not filter or change counts.
+
+## TIDP checklist source correction - 08/10/2026
+User-approved source edit: TIDP_Combined D2456:D2464 (TIDP-2455 through TIDP-2463), RLT / Lam Truong, changes Work type from Create Revit templates for each LPH to Output Checklists. Names, ownership and CW39 TRM / CW40 AUD / CW41 REV / CW42 CFM remain unchanged. Package totals become 14 templates and 64 checklists; overall planning population is unchanged.
