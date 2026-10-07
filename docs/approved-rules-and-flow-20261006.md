@@ -47,3 +47,6 @@ Seven Actual_CFM values have upload-created proxy lineage (six within snapshot, 
 ## Local repair follow-up
 
 Work Type-only ticket filtering uses Matrix Work Type directly, including tickets without uploaded Family links. System/Owner relationship requirements are unchanged. Arithmetic upload balance is detail-only and does not create a cohort filter. Semantic bundle validation rejects incompatible snapshot week/ISO year and nonreciprocal edges. See repair-verification-20261006.md for executed versus pending gates; no workbook policy changed.
+
+## MIDP labels - 07/10/2026
+User-approved: omit the MEP / prefix from MIDP Team / lot row labels; retain the lot label and original system filter, grouping and source values.

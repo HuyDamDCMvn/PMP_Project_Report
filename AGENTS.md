@@ -11,6 +11,17 @@ These are project-specific rules for the `PMP Dashboard` repository only.
 - Use this project session to maintain and apply the dashboard rules.
 - For dashboard UI/UX design, implementation, audit, or refinement, use the project skill at `.agents/skills/pmp-dashboard-ui-ux/SKILL.md`.
 
+## Approved decision register and agent workflow
+
+- Before changing dashboard calculations, labels, filters, evidence, refresh or delivery behavior, read `docs/approved-rules-and-flow-20261006.md` and the current-contract section of `docs/kpi-definition.md`. They contain the user-approved project decisions and are required implementation references, not optional history.
+- Explicit later user decisions supersede older presentation notes. Preserve the authoritative-source boundaries below. If current instructions conflict materially or a new rule would reinterpret source evidence, explain the conflict and ask for the missing decision before implementation.
+- Keep all-project Uploaded Families separate from TIDP-linked coverage. Overview's approved arithmetic remainder is not the list/count of unmatched planned names; never invent a link to reconcile the two.
+- Total issues means source error flags, not unique Families or tickets. Actual CFM, Actual_TRM and End Date are different milestones; do not substitute them for one another.
+- For forecast experiments requested as calculation-only, report the training window, complete/partial-week treatment, regression versus averaging, anchor, cap and limitations without changing code/data/UI. Implement only when requested. The approved CFM projection uses a four-complete-week cumulative regression slope, anchored at current actual and capped at Plan; do not silently apply it to other forecasts.
+- Simplifying labels or removing a review/banner does not approve unresolved proxy dates or remove source lineage/QA. Keep unresolved evidence explicit in metadata, details and documentation.
+- Follow the scoped flow: calculate/inspect → clarify material choices when needed → implement approved change → verify calculations and relevant browser behavior → leave local preview running. Push/publish requires explicit authorization; if authorized, verify the deployed commit/workflow and report the actual result.
+- Maintain new approved decisions in the project decision register/current KPI contract and route applicable skills to them. Do not store these project rules as global memory or modify unrelated skills.
+
 ## Authoritative data sources
 
 - The only authoritative source files are these three files in `RawSource/`:

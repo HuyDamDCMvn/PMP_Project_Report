@@ -17,6 +17,16 @@ Read the smallest relevant set before making changes:
 2. Read `docs/data-model.md`, `docs/kpi-definition.md`, and `docs/risk-rules.md` when a UI change affects values, labels, filtering, evidence, risk, status, or drill-down behavior.
 3. Inspect the existing implementation and preserve working information architecture, filter state, source traceability, and established component behavior unless the request changes them.
 4. Treat the three authoritative workbooks and the Family project filter in `AGENTS.md` as invariants. Never let a visual change reinterpret authoritative data.
+5. For calculations, labels, filtering, evidence, refresh or delivery changes, read [the approved project decision register](../../../docs/approved-rules-and-flow-20261006.md) and the current KPI contract. Resolve later approved overrides before relying on historical design notes. Snapshot counts in those documents are regression baselines, not constants to hard-code for new source releases.
+
+## Analysis-to-implementation flow
+
+- A request to calculate, compare or diagnose does not authorize code/data/UI changes. For forecast experiments, disclose the cohort, milestone, fitting window, partial-week exclusion, method, anchor and cap; compare with the current method before asking for a material missing choice.
+- Once implementation is requested, reuse pure domain selectors/calculations and the existing chart/detail/export components. A changed headline must reconcile with its supporting records. Keep all-project upload counts, linked TIDP coverage and arithmetic plan-minus-upload balances explicitly distinct.
+- Error totals must reconcile to the sum of source flags; their detail grain is one Family/error type, not an invented unique-ticket count. CFM/TRM/upload dates retain their own field semantics. Read the decision register for the approved regression method rather than copying a previous numerical result.
+- Removing an on-page warning/review is a presentation change, not evidence acceptance. Preserve source references and unresolved provenance elsewhere as defined by the project contract.
+- Verify the approved behavior with regression tests and the relevant live browser scope, then report what actually passed and what remains unverified. Documentation-only skill/rule edits require reference/frontmatter validation, not claims of new dashboard acceptance testing.
+- Keep local preview available after app changes. When explicitly asked to publish, validate/build, push without overwriting unrelated remote work, monitor CI/deployment and confirm the deployed release. A later local-only edit does not inherit blanket publication authority from an earlier delivery.
 
 ## Project design direction
 

@@ -6,6 +6,8 @@ CFM Forecast latest approved method: ordinary least-squares slope on four cumula
 
 Latest approved presentation override: the Overview upload donut displays 2,295 = 2,002 all-project uploads + 293 arithmetic remainder. This is not a matched-coverage composition; the distinct linked coverage remains 2,001/2,295 with 294 unmatched planned keys. Separate all-upload chart is removed. Total issues means the weekly sum of nine source error flags among eligible Returned Families, not unique Families or tickets. One Family/error flag is one detail row. CFM source lineage remains unchanged despite simplified labels and removal of the main-page review/banner.
 
+MIDP row labels omit the MEP / prefix (user decision 07/10/2026); lot labels, source team/system values, grouping and filters remain unchanged.
+
 This section alone defines current behavior. Sections below `Historical notes` are retained audit history, not alternative calculation rules.
 
 | Measure | Current definition and snapshot baseline |
