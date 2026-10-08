@@ -128,3 +128,17 @@ MEP Transmittal counts distinct TIDP-linked Families cumulatively by source Fami
 Actual now uses Family_vs_Tickets.Actual_CFM, not End Date, for distinct TIDP-linked Family confirmations through the reporting snapshot. Missing, invalid and future dates are excluded without fallback. The four-complete-week Forecast rate is recalculated from this same confirmation series. Weekly uploads and other upload KPIs continue using End Date.
 
 Plan counts distinct normalized Families in Revise the RFA library TIDP rows at their earliest scheduled CFM (Confirm) week, including combined activity cells such as REV | CFM. Families without a CFM marker are excluded from Plan. Duplicate Family rows count once. Actual upload dates and population remain unchanged; scheduled CFM is not evidence of completed confirmation. Forecast target follows this revised Plan.
+
+TIDP Family Upload presentation override (08/10/2026): arithmetic donut remains 2002/293. Separate owner bars count 2001 linked uploads and 294 planned names without links; one outside-TIDP upload is disclosed separately. No owner allocation of arithmetic remainder. See decision register.
+
+Ticket Hours owner stacks (08/10/2026): same scoped Matrix tickets and actualHours as the donut, grouped once by unambiguous linked TIDP owner first, otherwise canonical owner of the unambiguous System in ticket summary; ambiguous and unresolved owners remain explicit. Positive includes Re-Assessment. Segment sums reconcile to donut hours; no API recorder attribution is implied. Family coverage inline notes removed; arithmetic versus linked-coverage lineage remains in disclosure/docs.
+
+Ticket Hours stacked-bar override (08/10/2026): group by authoritative Matrix Reporter, superseding the preceding owner-attribution rule. Preserve exact username keys, display canonical names, and use Unknown reporter for missing values. Same scoped tickets, recorded hours and Positive/Re-Assessment classification as donut; no System/owner attribution.
+
+Ticket Count reporter stacks (08/10/2026): same scoped Matrix tickets as donut, grouped by exact Reporter and Positive/Negative classification (Re-Assessment included in Positive), one count per ticket. Segment totals reconcile with the donut. Shared Reporter filtering and exact ticket details apply.
+
+Uploaded outcome/error owner stacks (08/10/2026): owner derives from approved Family System assignment via familyErrorSystems and canonical System-owner mapping. Outcome stacks count uploaded Families once; error stacks count Returned source flags once per Family/type. Unknown/multiple buckets preserve totals. No source values or original donut cohorts change.
+
+Returned tickets by number of error types excludes zero-classified-error tickets (08/10/2026). Apply errorCount > 0 to donut, owner stacks, percentages and detail cohort only; retain them in other Returned metrics. Current chart total: 501.
+
+Positive Work Type reporter stacks (08/10/2026): recorded Matrix actualHours for same Positive/Re-Assessment cohort as donut, grouped by Reporter and primary Work Type. Sum reconciles to donut; exact usernames remain filter keys, canonical names display where available.

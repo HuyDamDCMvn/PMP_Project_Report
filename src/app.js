@@ -1,3 +1,4 @@
+import { tidpOwnerSlices, ownerBarsMarkup, ticketReporterHours, familyOwnerStacks } from "./tidp-owner-ring.js";
 import { uploadDetails, progressDetails } from './pie-detail-model.js';
 import "./styles.css";
 import { selectCohorts } from './cohorts.js';
@@ -8,7 +9,7 @@ import { familyTicketRows, returnedTicketErrors } from './returned-tickets.js';
 import { fetchPublishedData, createRefreshController } from './data-update.js';
 import { linkedUploadDates } from "./family-links.js";
 import { aggregateMidp, midpWeeklyActual, midpTableExport, ticketSystem } from "./midp.js";
-import { familyErrorSystems, renderReworkHeatmap } from './rework-heatmap.js';
+import { familyErrorSystems, SYSTEM_OWNERS, renderReworkHeatmap } from './rework-heatmap.js';
 import { selectTableRows, downloadCsv } from "./table-export.js";
 import { matchesIssueFilters, personName, samePerson, isoWeekKey } from "./issues.js";
 import { renderFamilyAnalysis } from "./issues-view.js";
@@ -133,7 +134,7 @@ function heading(extra = "") {
     ${active.length ? `<div class="filter-chips">${active.map(([key, value]) => `<button class="chip" data-set-filter="${key}" data-filter-value="${escapeHtml(value)}">${escapeHtml(key)}: ${escapeHtml(key === "owner" ? personName(value) : value)} ×</button>`).join("")}<button class="button" id="reset-filters">Reset Filters</button></div>` : ""}`;
 }
 
-function piePanel(id, title, slices, unit, source, { showSourceContext = false, disclosureTitle = "Chart purpose and legend definitions" } = {}) {
+function piePanel(id, title, slices, unit, source, { showSourceContext = false, disclosureTitle = "Chart purpose and legend definitions", ownerBars = "", barsBeside = false } = {}) {
   pieDetails.set(id, { title, unit, source });
   const total = slices.reduce((sum, item) => sum + item.value, 0);
   const number = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -185,10 +186,10 @@ function piePanel(id, title, slices, unit, source, { showSourceContext = false, 
       const laneRank = y < item.y ? side.length - index : index + 1;
       const distance = 2 + laneRank * Math.min(1.2, 5 / Math.max(1, side.length));
       const lane = right ? 42 + distance : -distance;
-      return `<g class="donut-label"><polyline points="${item.x},${item.y} ${lane},${item.y} ${lane},${y} ${end},${y}"/><circle cx="${item.x}" cy="${item.y}" r=".5" fill="${item.color}"/><text x="${textX}" y="${y - 1}" text-anchor="${right ? 'start' : 'end'}">${escapeHtml(labelNames[item.label] || item.label)}<tspan x="${textX}" dy="3.5">${number(item.value)} · ${share}%</tspan></text></g>`;
+      return `<g class="donut-label"><polyline points="${item.x},${item.y} ${lane},${item.y} ${lane},${y} ${end},${y}"/><circle cx="${item.x}" cy="${item.y}" r=".5" fill="${item.color}"/><text x="${textX}" y="${y - 1}" text-anchor="${right ? 'start' : 'end'}">${escapeHtml((labelNames[item.label] || item.label).replaceAll("_", " "))}<tspan x="${textX}" dy="3.5">${number(item.value)} · ${share}%</tspan></text></g>`;
     }).join("");
   }).join("");
-return `<details class="panel pie-panel" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span class="panel-expanded-label">Collapse</span><span class="panel-collapsed-label">Expand</span></summary><div class="pie-layout"><div class="donut-wrap"><svg viewBox="${id === 'returned-errors' ? '-64 -10 165 62' : '-46 -10 134 62'}" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button ${item.interaction?.kind === "detail" ? `data-pie-detail="${id}" data-slice-value="${escapeHtml(item.label)}" aria-label="Open planned Families without linked uploads"` : item.interaction?.kind === "none" ? "disabled" : `data-set-filter="${item.filter}" data-filter-value="${escapeHtml(item.label)}" aria-pressed="${state.filters[item.filter] === item.label}"`} class="pie-key ${item.interaction?.kind !== "detail" && state.filters[item.filter] === item.label ? "selected" : ""}"><i style="background:${item.color}"></i><span>${item.label}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div><details class="chart-source"><summary>${escapeHtml(disclosureTitle)}</summary><h3>Purpose and how to read this chart</h3><p>${source}</p>${renderLegendDefinitions(slices, escapeHtml, item => item.interaction?.kind === "detail" ? "Arithmetic balance: planned total minus uploaded total. Open a summary; this value does not identify a Family cohort." : `Group ${item.label} from source field ${item.filter}; values are ${unit}, and percentages are shares of the displayed total.`)}${showSourceContext ? `<p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p>` : ""}</details></details>`;
+return `<details class="panel pie-panel ${barsBeside ? "pie-with-side-bars" : ""}" data-collapse="${id}" ${state.collapsed[id] ? "" : "open"}><summary><h2>${title}</h2><span class="panel-expanded-label">Collapse</span><span class="panel-collapsed-label">Expand</span></summary>${barsBeside ? '<div class="pie-side-content">' : ""}<div class="pie-layout"><div class="donut-wrap"><svg viewBox="${id === 'returned-errors' ? '-64 -10 165 62' : '-46 -10 134 62'}" role="group" aria-label="${escapeHtml(slices.map((item) => `${item.label}: ${number(item.value)} ${unit}`).join(', '))}"><circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(--grey-soft)" stroke-width="9"/><g transform="rotate(-90 21 21)">${marks}</g>${labels}<text class="donut-center-value" x="21" y="21" text-anchor="middle">${number(total)}</text><text class="donut-center-unit" x="21" y="25" text-anchor="middle">${unit}</text></svg></div><div class="pie-legend">${slices.map((item) => `<button ${item.interaction?.kind === "detail" ? `data-pie-detail="${id}" data-slice-value="${escapeHtml(item.label)}" aria-label="Open planned Families without linked uploads"` : item.interaction?.kind === "none" ? "disabled" : `data-set-filter="${item.filter}" data-filter-value="${escapeHtml(item.label)}" aria-pressed="${state.filters[item.filter] === item.label}"`} class="pie-key ${item.interaction?.kind !== "detail" && state.filters[item.filter] === item.label ? "selected" : ""}"><i style="background:${item.color}"></i><span>${escapeHtml(item.label.replaceAll("_", " "))}</span><strong>${number(item.value)}</strong><small>${total ? (item.value / total * 100).toFixed(1) : '0.0'}%</small></button>`).join("")}${!total ? '<p class="empty">No related records match the current filters.</p>' : ''}</div></div>${ownerBars}${barsBeside ? "</div>" : ""}<details class="chart-source"><summary>${escapeHtml(disclosureTitle)}</summary><h3>Purpose and how to read this chart</h3><p>${source}</p>${renderLegendDefinitions(slices, escapeHtml, item => item.interaction?.kind === "detail" ? "Arithmetic balance: planned total minus uploaded total. Open a summary; this value does not identify a Family cohort." : `Group ${item.label} from source field ${item.filter}; values are ${unit}, and percentages are shares of the displayed total.`)}${showSourceContext ? `<p>As of ${fmtDate(data.meta.asOf)}. Select a legend item to filter related dashboard records.</p>` : ""}</details></details>`;
 }
 
 function kpi(label, value, note, tone = "", action = "") {
@@ -328,29 +329,46 @@ function overviewView(scoped) {
   const eligibleIds = new Set(uploadedFamilyRows(families,data.meta.asOf).map(f=>f.id));
 
   const familyKeys = new Map(rfa.map((item) => [item.familyKey, eligibleIds.has(item.familyId)]).filter(([key]) => key));
+  const ownerSlices = tidpOwnerSlices(rfa, eligibleIds);
+  ownerSlices.forEach((s,i) => pieDetails.set(`midp:owner-ring:${i}`, { title: `${s.status} · ${s.owner}`, rows: s.rows }));
   const uploadedCount = eligibleIds.size;
   const linkedUploadCount = [...familyKeys.values()].filter(Boolean).length;
   const evidenceScoped = filtered().evidenceSelected;
   const pendingLabel = evidenceScoped ? 'Not matched in selected evidence' : 'Not Yet Upload';
   const hours = ["Positive", "Negative"].map((label, index) => ({ label, value: tickets.filter((item) => hourClass(item) === label).reduce((sum, item) => sum + Number(item.actualHours || 0), 0), filter: "active", color: ["var(--green)", "var(--red)"][index] }));
+  const ownerHours = ticketReporterHours(tickets, hourClass);
+  ownerHours.forEach((s,i) => pieDetails.set(`midp:owner-hours:${i}`, { title: `${s.status} hours · ${personName(s.owner)}`, rows: s.rows, columns: ['id', 'summary', 'active', 'reporter', 'handler', 'status', 'actualHours', 'end'], valueLabel: 'Recorded ticket hours' }));
+  const reporterCounts = ticketReporterHours(tickets, hourClass, () => 1);
+  reporterCounts.forEach((s,i) => pieDetails.set(`midp:reporter-count:${i}`, { title: `${s.status} tickets · ${personName(s.owner)}`, rows: s.rows, columns: ['id', 'summary', 'active', 'reporter', 'handler', 'status', 'end'], valueLabel: 'Reporter ticket count' }));
   const ticketCounts = ["Positive", "Negative"].map((label, index) => ({ label, value: tickets.filter((item) => hourClass(item) === label).length, filter: "active", color: ["var(--green)", "var(--red)"][index] }));
   const positiveTickets = tickets.filter((item) => hourClass(item) === "Positive");
   const workHours = new Map();
   positiveTickets.forEach((item) => workHours.set(item.workType, (workHours.get(item.workType) || 0) + Number(item.actualHours || 0)));
   const workColors = ["#1f5a94", "#237a57", "#b26a00", "#7849a3", "#187e85", "#b42318", "#596579"];
   const positiveByWork = [...workHours].sort((a, b) => b[1] - a[1]).map(([label, value], index) => ({ label, value, filter: "workType", color: workColors[index % workColors.length] }));
+  const reporterWorkGroups = new Map();
+  for (const ticket of positiveTickets) {
+    const owner = ticket.reporter || 'Unknown reporter';
+    const status = ticket.workType;
+    const key = JSON.stringify([owner,status]);
+    if (!reporterWorkGroups.has(key)) reporterWorkGroups.set(key, { owner, status, value:0, rows:[] });
+    const group = reporterWorkGroups.get(key);
+    group.value += Number(ticket.actualHours || 0); group.rows.push(ticket);
+  }
+  const reporterWorkStacks = [...reporterWorkGroups.values()];
+  reporterWorkStacks.forEach((slice,i) => pieDetails.set(`midp:reporter-work-hours:${i}`, { title:`${slice.status} · ${personName(slice.owner)}`, rows:slice.rows, columns:['id','summary','workType','reporter','handler','active','actualHours','end'], valueLabel:'Positive recorded hours' }));
   const positiveByReporter = [...groupCount(positiveTickets, (item) => item.reporter || "Unknown reporter")]
     .sort((a, b) => b[1] - a[1])
     .map(([label, value], index) => ({ label, value, filter: "reporter", color: workColors[index % workColors.length] }));
   return `${heading()}
 
     <div class="grid-2 overview-charts">
-      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", definition: "All eligible project uploads in the selected evidence, including uploads outside TIDP.", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: pendingLabel, definition: "Arithmetic balance: planned total minus eligible project uploads. Open the distinct planned Families without a linked upload; this list can have a different count.", value: Math.max(0, familyKeys.size - uploadedCount), color: "var(--amber)", interaction: { kind: "detail", target: "upload-arithmetic-balance" } }], "families in TIDP", evidenceScoped ? 'The center retains the native planning baseline. Uploaded counts all project uploads in the selected evidence only. Amber means not matched in this evidence selection, not proof that the Family has never been uploaded. Clear evidence filters for full-snapshot coverage.' : `This chart compares the planned RFA total with all uploaded project Families. Linked TIDP coverage remains ${linkedUploadCount}/${familyKeys.size}; ${familyKeys.size - linkedUploadCount} planned names have no linked upload. The amber count is the arithmetic balance, not the unmatched-name list. This chart shows upload progress for the unique Families in the TIDP RFA scope. The center is the total number of Families. Green counts all project uploads; amber is planned total minus uploads. Each percentage is its share of the total. Open Uploaded for Family details; its legend filters uploads. The amber slice and legend open distinct planned Families without a linked upload in the selected evidence. The list count differs from the arithmetic balance when uploads outside TIDP exist. Opening details does not change filters.`, { disclosureTitle: "Chart purpose and legend definitions", showSourceContext: false })}
-      ${piePanel("ticket-hours", "Annotation Project Ticket Hours", hours, "total hours", "This chart shows recorded annotation ticket hours. The center is total hours. Green represents Positive work (including Re-Assessment); red represents Negative work. Numbers are hours and percentages show each group's share of the total. Each ticket contributes its recorded hours once; tickets without recorded hours are excluded. Click a slice for its tickets, or a legend item to filter the dashboard.")}
+      ${piePanel("family-upload", "TIDP Family Upload", [{ label: "Uploaded", definition: "All eligible project uploads in the selected evidence, including uploads outside TIDP.", value: uploadedCount, color: "var(--green)", filter: "upload" }, { label: pendingLabel, definition: "Arithmetic balance: planned total minus eligible project uploads. Open the distinct planned Families without a linked upload; this list can have a different count.", value: Math.max(0, familyKeys.size - uploadedCount), color: "var(--amber)", interaction: { kind: "detail", target: "upload-arithmetic-balance" } }], "families in TIDP", evidenceScoped ? 'The center retains the native planning baseline. Uploaded counts all project uploads in the selected evidence only. Amber means not matched in this evidence selection, not proof that the Family has never been uploaded. Clear evidence filters for full-snapshot coverage.' : `This chart compares the planned RFA total with all uploaded project Families. Linked TIDP coverage remains ${linkedUploadCount}/${familyKeys.size}; ${familyKeys.size - linkedUploadCount} planned names have no linked upload. The amber count is the arithmetic balance, not the unmatched-name list. This chart shows upload progress for the unique Families in the TIDP RFA scope. The center is the total number of Families. Green counts all project uploads; amber is planned total minus uploads. Each percentage is its share of the total. Open Uploaded for Family details; its legend filters uploads. The amber slice and legend open distinct planned Families without a linked upload in the selected evidence. The list count differs from the arithmetic balance when uploads outside TIDP exist. Opening details does not change filters.`, { disclosureTitle: "Chart purpose and legend definitions", showSourceContext: false, ownerBars: ownerBarsMarkup(ownerSlices, eligibleIds.size - new Set(rfa.map(r => r.familyId).filter(id => eligibleIds.has(id))).size, escapeHtml) })}
+      ${piePanel("ticket-hours", "Annotation Project Ticket Hours", hours, "total hours", "This chart shows recorded annotation ticket hours. The center is total hours. Green represents Positive work (including Re-Assessment); red represents Negative work. Numbers are hours and percentages show each group's share of the total. Each ticket contributes its recorded hours once; tickets without recorded hours are excluded. Click a slice for its tickets, or a legend item to filter the dashboard. Stacked bars group by Matrix Reporter; missing reporters remain Unknown reporter. Reporter names filter the shared Reporter dimension. Each ticket contributes once, including Re-Assessment in Positive.", { ownerBars: ownerBarsMarkup(ownerHours, 0, escapeHtml, { statuses: ["Positive", "Negative"], colors: ["green", "red"], detailPrefix: "owner-hours", format: fmt, unit: " h", filter: "reporter", label: personName }) })}
     </div>
-    ${piePanel("positive-work-type", "Positive Hours by Work Type", positiveByWork, "positive hours", "This chart shows Positive hours (including Re-Assessment) by work type. The center is total Positive hours. Each color is a work type; numbers are recorded hours and percentages are shares of the total. Each ticket contributes once to its primary work type. Click a slice for its tickets, or a legend item to filter the dashboard.")}
+    ${piePanel("positive-work-type", "Positive Hours by Work Type", positiveByWork, "positive hours", "This chart shows Positive hours (including Re-Assessment) by work type. The center is total Positive hours. Each color is a work type; numbers are recorded hours and percentages are shares of the total. Each ticket contributes once to its primary work type. Reporter stacks use the same recorded hours and work-type colors. Click a segment for its tickets, or a reporter name to filter related components.", { ownerBars:ownerBarsMarkup(reporterWorkStacks, 0, escapeHtml, { statuses:positiveByWork.map(s=>s.label), colors:positiveByWork.map(s=>s.color), detailPrefix:"reporter-work-hours", format:fmt, unit:" h", filter:"reporter", label:personName, segmentLabels:true, showValues:false }) })}
     <div class="kpi-grid secondary-kpis">
-      ${piePanel("ticket-count", "Annotation Project Ticket Count", ticketCounts, "total tickets", "This chart shows annotation ticket counts across all statuses. The center is the total ticket count. Green represents Positive tickets (including Re-Assessment); red represents Negative tickets. Each ticket is counted once; percentages show each group's share. Click a slice for its tickets, or a legend item to filter the dashboard.")}
+      ${piePanel("ticket-count", "Annotation Project Ticket Count", ticketCounts, "total tickets", "This chart shows annotation ticket counts across all statuses. The center is the total ticket count. Green represents Positive tickets (including Re-Assessment); red represents Negative tickets. Each ticket is counted once; percentages show each group's share. Stacked bars group by Matrix Reporter; missing reporters remain Unknown reporter. Click a segment for its tickets, or a reporter name to filter the dashboard.", { ownerBars: ownerBarsMarkup(reporterCounts, 0, escapeHtml, { statuses: ["Positive", "Negative"], colors: ["green", "red"], showValues: false, segmentLabels: true, detailPrefix: "reporter-count", format: fmt, unit: " tickets", filter: "reporter", label: personName }) })}
       ${piePanel("positive-reporters", "Positive Tickets by Reporter", positiveByReporter, "positive tickets", "This chart shows Positive tickets (including Re-Assessment), grouped by reporter. The center is the total Positive ticket count. Each color identifies a reporter, the person who reported the ticket. Numbers are ticket counts and percentages show each reporter's share of the total. Click a slice for ticket details, or a legend item to filter the dashboard.", { showSourceContext: false })}
     </div>
     ${familyProgressChart(deliverables, families)}`;
@@ -538,18 +556,36 @@ function heatmap(rows, weeks, metric) {
 
 function familyAnalysisView(scoped) {
   const { families: uploaded, tickets } = uploadedFamilyCohort(scoped.families, scoped.tickets, data.meta.asOf);
+  const ownerSystems = familyErrorSystems(data.deliverables, data.families);
+  const registerOwnerStacks = (slices, prefix, unit) => {
+    slices.forEach((slice, i) => pieDetails.set(`midp:${prefix}:${i}`, { title: `${slice.status} · ${slice.owner}`, rows: familyTicketRows(slice.rows), columns: ['ticketId', 'name', 'category', 'uploader', 'reworkOutcome', 'end'], valueLabel: unit }));
+  };
+  const outcomeStacks = familyOwnerStacks(uploaded, ownerSystems, SYSTEM_OWNERS, family => [familyOutcome(family)]);
+  registerOwnerStacks(outcomeStacks, 'outcome-owner', 'Uploaded Families');
   const familyChart = piePanel("family-outcomes", "Uploaded Families", [
     { label: "One pass", value: uploaded.filter(item => familyOutcome(item) === "One pass").length, color: "var(--green)", filter: "familyOutcome" },
     { label: "Returned", value: uploaded.filter(item => familyOutcome(item) === "Returned").length, color: "var(--red)", filter: "familyOutcome" },
     { label: "Unclassified", value: uploaded.filter(item => familyOutcome(item) === "Unclassified").length, color: "var(--grey)", filter: "familyOutcome" },
-  ].filter(slice => slice.label !== "Unclassified" || slice.value > 0), "uploaded families", "This chart shows review outcomes for uploaded Families in this project. The center is the unique uploaded Family count. Green (One pass) means recorded as passing without return; red (Returned) means returned for rework. Grey (Unclassified) appears when an outcome is missing. Numbers count Families once and percentages show their share of the total. Click a slice for Family details, or a legend item to filter the dashboard.");
+  ].filter(slice => slice.label !== "Unclassified" || slice.value > 0), "uploaded families", "This chart shows review outcomes for uploaded Families in this project. The center is the unique uploaded Family count. Green (One pass) means recorded as passing without return; red (Returned) means returned for rework. Grey (Unclassified) appears when an outcome is missing. Numbers count Families once and percentages show their share of the total. Click a slice for Family details, or a legend item to filter the dashboard. Owner stacks use approved Family-to-System links and canonical responsibility mapping; unknown or multiple owners remain explicit.", { barsBeside: true, ownerBars: ownerBarsMarkup(outcomeStacks, 0, escapeHtml, { statuses: ["One pass", "Returned", "Unclassified"], colors: ["green", "red", "grey"], segmentLabels: true, detailPrefix: "outcome-owner", format: fmt, unit: " families" }) });
   return renderFamilyAnalysis({ tickets, families: uploaded, familyChart, asOf: data.meta.asOf, filters: state.filters, collapsed: state.collapsed,
     returnedTicketChart: (() => {
       const scopedIds = new Set(uploaded.filter(f => familyOutcome(f) === 'Returned').flatMap(f => f.ticketIds));
-      const rows = returnedTicketErrors(uploadedFamilyRows(data.families, data.meta.asOf), tickets).filter(ticket => scopedIds.has(ticket.id));
+      const rows = returnedTicketErrors(uploadedFamilyRows(data.families, data.meta.asOf), tickets).filter(ticket => scopedIds.has(ticket.id) && ticket.errorCount > 0);
       const counts = groupCount(rows, row => row.returnedErrorCount);
       const colors = ['var(--blue)', 'var(--green)', 'var(--amber)', 'var(--red)', 'var(--brown)', 'var(--grey)'];
-      const chart = piePanel('returned-ticket-count', 'Returned tickets by number of error types', [...counts].sort((a,b) => Number(a[0].split(' ')[0]) - Number(b[0].split(' ')[0])).map(([label,value],i) => ({ label, value, filter: 'returnedErrorCount', color: colors[i % colors.length] })), 'returned tickets', 'Each linked Matrix Ticket ID is counted once. The number of error types is the union of distinct recorded types across its uploaded Returned Families through the snapshot. Repeated flags of the same type count once per ticket. Zero error types means Returned with no classified error. Select a legend to filter related records; click a slice for ticket details. Tickets without a Returned Family link are outside this scope.');
+      const ownerGroups = new Map();
+      for (const ticket of rows) {
+        const owners = new Set(data.families.filter(f => familyOutcome(f) === 'Returned' && f.ticketIds.includes(ticket.id)).map(f => SYSTEM_OWNERS[ownerSystems.get(f.id)] || (ownerSystems.get(f.id) === 'Multiple systems' ? 'Multiple owners' : 'Unknown owner')));
+        const owner = owners.size === 1 ? [...owners][0] : 'Multiple owners';
+        const status = ticket.returnedErrorCount;
+        const key = JSON.stringify([owner,status]);
+        if (!ownerGroups.has(key)) ownerGroups.set(key, { owner, status, value:0, rows:[] });
+        const group = ownerGroups.get(key); group.value++; group.rows.push(ticket);
+      }
+      const ownerStacks = [...ownerGroups.values()];
+      ownerStacks.forEach((slice,i) => pieDetails.set(`midp:returned-count-owner:${i}`, { title: `${slice.status} · ${slice.owner}`, rows:slice.rows, columns:['ticketId','summary','reporter','handler','status','errorTypes','end'], valueLabel:'Returned tickets' }));
+      const statuses = [...counts.keys()].sort((a,b) => parseInt(a)-parseInt(b));
+      const chart = piePanel('returned-ticket-count', 'Returned tickets by number of error types', [...counts].sort((a,b) => Number(a[0].split(' ')[0]) - Number(b[0].split(' ')[0])).map(([label,value],i) => ({ label, value, filter: 'returnedErrorCount', color: colors[parseInt(label) % colors.length] })), 'returned tickets', 'Each linked Matrix Ticket ID is counted once. The number of error types is the union of distinct recorded types across its uploaded Returned Families through the snapshot. Repeated flags of the same type count once per ticket. Tickets without classified source errors are excluded from this chart only. Select a legend to filter related records; click a slice for ticket details. Tickets without a Returned Family link are outside this scope. Owner stacks use approved Returned Family System responsibility; each ticket counts once, with Multiple owners for ambiguous responsibility.', { barsBeside:true, ownerBars:ownerBarsMarkup(ownerStacks, 0, escapeHtml, { statuses, colors:statuses.map(status => colors[parseInt(status) % colors.length]), detailPrefix:"returned-count-owner", format:fmt, unit:" tickets", segmentLabels:true, showValues:false }) });
       pieDetails.set('returned-ticket-count', { title: 'Returned tickets by number of error types', rows });
       return chart;
     })(),
@@ -562,7 +598,9 @@ function familyAnalysisView(scoped) {
       const counts = new Map();
       returned.forEach(f => (f.reworkErrors || []).forEach(type => counts.set(type, (counts.get(type) || 0) + 1)));
       const colors = ['var(--blue)', 'var(--green)', 'var(--amber)', 'var(--red)', 'var(--brown)', 'var(--grey)'];
-      return piePanel('returned-errors', 'Returned · error types', [...counts].sort((a,b) => b[1]-a[1]).map(([label,value],i) => ({ label, value, filter:'reworkError', color:colors[i % colors.length] })), 'error flags', `Source: Family_Upload_vs_Annotation_Tickets_Checked.xlsx, Family_vs_Tickets. ${returned.length} Returned Families; ${new Set(returned.flatMap(f => f.ticketIds)).size} unique linked tickets. Counts preserve X flags in each source error column. One Family may have multiple error types; the center and percentages count error flags, not unique tickets or mutually exclusive categories. Blank cells are not errors. Select a legend to filter related records; click a slice for Family evidence.`);
+      const errorStacks = familyOwnerStacks(returned, ownerSystems, SYSTEM_OWNERS, family => family.reworkErrors || []);
+      registerOwnerStacks(errorStacks, 'error-owner', 'Source error flags');
+      return piePanel('returned-errors', 'Returned · error types', [...counts].sort((a,b) => b[1]-a[1]).map(([label,value],i) => ({ label, value, filter:'reworkError', color:colors[i % colors.length] })), 'error flags', `Source: Family_Upload_vs_Annotation_Tickets_Checked.xlsx, Family_vs_Tickets. ${returned.length} Returned Families; ${new Set(returned.flatMap(f => f.ticketIds)).size} unique linked tickets. Counts preserve X flags in each source error column. One Family may have multiple error types; the center and percentages count error flags, not unique tickets or mutually exclusive categories. Blank cells are not errors. Select a legend to filter related records; click a slice for Family evidence. Owner stacks preserve the same source flags and approved System responsibility mapping.`, { barsBeside: true, ownerBars: ownerBarsMarkup(errorStacks, 0, escapeHtml, { statuses: [...counts].sort((a,b) => b[1]-a[1]).map(([type]) => type), colors: [...counts].sort((a,b) => b[1]-a[1]).map((_,i) => colors[i % colors.length]), showValues: false, segmentLabels: true, detailPrefix: "error-owner", format: fmt, unit: " flags" }) });
     })(),
     weeklyHoursChart: renderWeeklyHours({ axisStep: state.hoursAxisStep, dataset: timeHistory, tickets: scoped.tickets, filters: state.filters, panel, register: (id, meta) => pieDetails.set(id, meta), escapeHtml, fmt }),
     weeklyFamilyEffortChart: renderWeeklyFamilyEffort({ roleHours: familyRoleHours, axisStep: state.effortAxisStep, families: uploaded, tickets, asOf: data.meta.asOf, filters: state.filters, panel, register: (id, meta) => pieDetails.set(id, meta), fmt }),
@@ -882,7 +920,7 @@ function wireEvents() {
       const rows = meta.rows.filter(r => !week || (actual ? r.actualWeek === week : r.weeks.some(w => w.week === week)));
       pieDetailTrigger = midp;
       const actualColumns = rows.some(row => row.familyKey) ? ["id", "title", "system", "owner", "end"] : ["id", "title", "system", "reporter", "handler", "status", "end"];
-      pieDetailSelection = { id, value: week ? `CW${week}` : "All planned items", rows, columns: actual ? actualColumns : ["id", "title", "system", "owner", "workType", "plannedStartWeek", "plannedFinishWeek"], sort: "", descending: true, searches: {} };
+      pieDetailSelection = { id, value: week ? `CW${week}` : (meta.valueLabel || "All planned items"), rows, columns: meta.columns || (actual ? actualColumns : ["id", "title", "system", "owner", "workType", "plannedStartWeek", "plannedFinishWeek"]), sort: "", descending: true, searches: {} };
       renderPieDetails(); document.querySelector('.drawer-close')?.focus(); return;
     }
     const familyLegend = event.target.closest("[data-toggle-family-series]");
@@ -947,7 +985,7 @@ function wireEvents() {
     if (exportButton) { exportCsv(exportButton.dataset.tableExport, exportButton); return; }
   });
   document.addEventListener("keydown", (event) => {
-    const slice = event.target.closest("[data-pie-detail], [data-progress-detail]");
+    const slice = event.target.closest("[data-pie-detail], [data-progress-detail], [data-midp-detail]");
     if (slice && slice.tagName.toLowerCase() !== "button" && ["Enter", " "].includes(event.key)) { event.preventDefault(); slice.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
     const drawer = document.querySelector(".drawer");
     if (!drawer) return;

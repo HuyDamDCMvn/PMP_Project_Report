@@ -62,3 +62,41 @@ User-approved source edit: TIDP_Combined D2456:D2464 (TIDP-2455 through TIDP-246
 
 ## Weekly linked issues upload line - 08/10/2026
 User-approved: retain Total issues and nine error lines; add a solid Uploaded Families line from the same weekly unique End Date cohort as Weekly Family uploads, including all outcomes. Use the existing count axis. No cumulative TRM or upload forecast is added.
+
+## TIDP owner rings - 08/10/2026
+Latest user override: TIDP Family Upload uses linked coverage 2001 Uploaded + 294 No linked upload = 2295 distinct planned keys. Exclude the one outside-TIDP upload from this chart only. Inner ring splits upload linkage status; outer ring groups each status by direct TIDP owner. Multiple owners remain explicit. Segment details use the exact planned-key population; owner legends compose the shared Owner filter. This supersedes the prior arithmetic donut presentation; all-project upload measures remain unchanged.
+
+## Owner bar chart replaces outer donut - 08/10/2026
+Latest approved override: restore arithmetic donut 2002 Uploaded / 293 remainder, remove outer owner ring. Add owner bars for true linked coverage 2001 Uploaded / 294 without linked upload, plus a separate one-upload outside-TIDP note. Never distribute the arithmetic 293 remainder to owners. Bars open exact planned-key detail; owner names filter shared Owner.
+
+08/10/2026 presentation follow-up: integrate the owner bars inside the TIDP Family Upload panel below its donut, sharing collapse/resize. Preserve all approved arithmetic versus linked-coverage definitions and interactions.
+
+08/10/2026: owner coverage uses one absolute-count stacked bar per owner (Uploaded green + No linked upload amber), with a common maximum-owner-total scale. Exact segment values and total remain visible; segment details and owner filters retain existing behavior.
+
+08/10/2026: remove the two inline Family owner-coverage explanatory paragraphs; preserve lineage in chart disclosure and documentation. Integrate Positive/Negative recorded Matrix ticket hours as stacked bars by unambiguous linked TIDP owner, otherwise canonical System owner (ticket summary system), with explicit Multiple owners or Unknown owner. Count each ticket once; Re-Assessment remains Positive. Owner labels use shared Owner filters; segments open source ticket details. No hours-source or upload-count change.
+
+08/10/2026 latest override: Ticket Hours stacked bars group by Matrix Reporter, replacing System/TIDP owner attribution. Preserve source reporter usernames as grouping/filter keys and display canonical names where available. Missing reporter = Unknown reporter. Each ticket contributes recorded hours once; Positive includes Re-Assessment. Names filter Reporter; segments open exact reporter/classification tickets. Family owner bars remain unchanged.
+
+08/10/2026: integrate Positive/Negative stacked bars by Matrix Reporter in Annotation Project Ticket Count. Same scoped ticket population/classification as donut; each ticket counts once. Canonical display names preserve exact reporter username filter keys; missing reporter remains Unknown reporter. Names compose shared Reporter filters; segments open exact reporter/classification ticket details.
+
+08/10/2026: add integrated side-by-side owner stacks to Uploaded Families (One pass/Returned/Unclassified) and Returned error types (source flags by type). Use existing approved familyErrorSystems links/responsibility exception and canonical System owners. Unknown/multiple owners remain explicit; each Family counts once per outcome/type, with no ticket-count substitution. Owner names use shared Owner filters; segments open Family evidence with Ticket IDs. Reflow below donut on narrow screens.
+
+08/10/2026 layout follow-up: owner stacks for Uploaded Families and Returned error types sit to the right of the donut on wide screens, reflowing below on narrow screens. Remove per-owner error-type value paragraphs; retain exact values in segment title/accessible label and source detail. No calculation changes.
+
+08/10/2026 presentation override: compact Uploaded Families legend values beside labels. Returned error types places legend to the right of donut on wide screens and owner stacks below the donut/legend row. Narrow screens reflow vertically. Values, filtering and detail behavior unchanged.
+
+08/10/2026: show exact numeric labels on Returned error owner-stack segments. Small segments place numbers above the bar; preserve accessible values, source details and counts.
+
+08/10/2026: compact Returned error legend into short rows with inline count/percentage, allocate more width to donut. Add numeric segment labels to Uploaded Families owner stacks; preserve counts and detail interactions.
+
+08/10/2026: Returned tickets by number of error types gains owner stacks on the right, compact legend and larger donut area. Owner uses approved System responsibility across all linked Returned Families; ambiguity remains Multiple owners, missing assignment Unknown owner. Each existing returned ticket counts once in its error-count category; segments open exact ticket evidence. Narrow screens reflow vertically.
+
+08/10/2026 user override: exclude returned tickets with zero classified source error types from Returned tickets by number of error types, its owner stacks and details. Other Returned Family/ticket metrics remain unchanged. Current chart population becomes 501 tickets; #72578 remains Returned elsewhere but is excluded here.
+
+08/10/2026: donut labels and legends display underscores as spaces; preserve original source/filter keys.
+
+08/10/2026: balance Returned ticket distribution layout with a centered donut/compact aligned legend on the left and owner stacks on the right, consistent gaps and bar heights. No population or interaction change.
+
+08/10/2026 latest layout override: Returned tickets by number of error types places donut left and legend right in the top row, with owner stacks spanning the row below. Narrow screens stack vertically. Supersedes preceding side-by-side owner layout; counts and interactions unchanged.
+
+08/10/2026: Positive Hours by Work Type adds reporter stacks below donut-left/legend-right row. Group exact Matrix Reporter usernames and Work Type, summing same Positive/Re-Assessment recorded hours once per ticket. Reuse donut colors, numeric segment labels, Reporter filters and source-ticket details. No API attribution or source change.
